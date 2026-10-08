@@ -1,0 +1,8 @@
+{
+  "id": "bounty",
+  "heapRequest": 8192,
+  "require": [
+    "botw.events@1.0",
+    "botw.gamedata@1.0"
+  ]
+}

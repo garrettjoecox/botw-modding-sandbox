@@ -1,0 +1,7 @@
+{
+  "id": "stamina",
+  "heapRequest": 8192,
+  "require": [
+    "botw.gamedata@1.0"
+  ]
+}

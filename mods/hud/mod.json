@@ -1,0 +1,10 @@
+{
+  "id": "hud",
+  "heapRequest": 8192,
+  "require": [
+    "botw.gui@1.1",
+    "botw.world@1.0",
+    "botw.player@1.1",
+    "botw.gamedata@1.0"
+  ]
+}

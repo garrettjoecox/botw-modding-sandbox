@@ -1,0 +1,3 @@
+#!/bin/bash
+# macOS/Linux entry point. Windows: use wxl.cmd.
+exec python3 "$(dirname "$0")/tools/wxl.py" "$@"

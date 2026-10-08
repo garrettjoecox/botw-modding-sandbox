@@ -1,0 +1,10 @@
+# Editor-only settings for every mod in this folder.
+#
+# Builds run devkitPPC's powerpc-eabi-g++ inside Docker (tools/dkp), and each
+# build writes compile_commands.json with that compiler's flags. clangd on the
+# Mac can't run that compiler and rejects some GCC/PowerPC-only flags, so swap
+# in the host clang and drop those flags. This only affects squiggles and
+# autocomplete - the real build is unchanged.
+CompileFlags:
+  Compiler: clang++
+  Remove: [-msdata=*, -Wduplicated-cond, -Wduplicated-branches, -ffreestanding]

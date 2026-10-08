@@ -1,0 +1,1070 @@
+diff --git i/include/wiixlaunch/imports/wiixl_call.h w/include/wiixlaunch/imports/wiixl_call.h
+index 31af92e..1e311cc 100644
+--- i/include/wiixlaunch/imports/wiixl_call.h
++++ w/include/wiixlaunch/imports/wiixl_call.h
+@@ -19,14 +19,12 @@
+ 
+ extern "C" {
+ 
+-// One offset per platform, and the host picks. A mod that hard-coded the Wii U
+-// address would be silently wrong on Switch; this way the wrong-platform case
+-// cannot arise at the call site at all.
++// One offset per platform, and the host picks, so the wrong-platform case
++// can't arise at the call site.
+ extern uintptr_t wiixl_import__wiixl_call__ResolveTarget(uintptr_t switchOffset, uintptr_t wiiuOffset);
+ 
+-// Where the image starts, for a mod doing its own arithmetic. Same value
+-// wiixl.core's ImageBase reports; here so a mod using wiixl.call does not have
+-// to declare wiixl.core as well for one number.
++// Same value wiixl.core's ImageBase reports; here so a mod using
++// wiixl.call doesn't have to declare wiixl.core too for one number.
+ extern uintptr_t wiixl_import__wiixl_call__ImageBase(void);
+ }
+ 
+diff --git i/include/wiixlaunch/imports/wiixl_core.h w/include/wiixlaunch/imports/wiixl_core.h
+index 905b05a..cc92f7c 100644
+--- i/include/wiixlaunch/imports/wiixl_core.h
++++ w/include/wiixlaunch/imports/wiixl_core.h
+@@ -19,98 +19,56 @@
+ 
+ extern "C" {
+ 
+-//
+-// Deliberately NOT varargs. A mod formats its own text and hands over a
+-// finished string; the host's formatter and the mod's need not agree, and a
+-// vararg mismatch across this boundary is not diagnosable.
++// Not varargs: a mod formats its own text and hands over a finished string,
++// so a vararg mismatch across the host/mod boundary can't happen.
+ extern void wiixl_import__wiixl_core__Log(const char* text);
+ extern uint32_t wiixl_import__wiixl_core__AbiVersion(void);
+ 
+-// Bytes from the host heap. Never freed, matching every other allocator in
+-// this project. Stage 5 replaces the implementation with a per-module
+-// sub-arena; the signature does not change, which is the point of routing mod
+-// allocation through a surface now rather than letting mods call the backend.
++// Through the arena, so the allocation is charged to and bounded by the
++// calling module's own grant.
+ extern void* wiixl_import__wiixl_core__Alloc(uint32_t size, uint32_t align);
+ 
+-// Reads a whole file from game content. Returns bytes read, or a negative value
+-// on failure. `outRead` may be null.
+-//
+-// The v1.0 spelling of GameReadFile, kept resolvable for mods built against it.
++// The v1.0 spelling of GameReadFile, kept resolvable for old mods.
+ extern int32_t wiixl_import__wiixl_core__ReadFile(const char* path, void* buffer, uint32_t maxSize);
+-
+-// Does a path exist and open? Cheap existence check that does not need a
+-// buffer, for a mod deciding whether an optional asset is present.
+ extern uint32_t wiixl_import__wiixl_core__FileExists(const char* path);
+-
+-// The code cave base, so a mod can reason about where it is. Opaque to the mod
+-// beyond being an address.
+ extern uintptr_t wiixl_import__wiixl_core__ImageBase(void);
+ 
+-//
+-// How much this module was actually granted, how much it has spent, and how
+-// much is left. Callable DURING the load phase, before allocating.
+-//
+-// A module on the best-effort path (heapRequest == 0) is told what it got
+-// rather than having to discover it by allocating until null. "Allocate until
+-// null" is not a design; it is finding out by failing, in a place where failing
+-// means a half-initialised mod running in someone's game.
+-//
+-// A module that stated a heapRequest already knows its size, but not what it
+-// has spent, so all three are useful to both.
++// Granted/used/remaining for the calling module's arena. Callable during
++// load, before allocating, so a best-effort module can size a buffer instead
++// of discovering its limit by allocating until null.
+ extern uint32_t wiixl_import__wiixl_core__HeapGranted(void);
+ extern uint32_t wiixl_import__wiixl_core__HeapUsed(void);
+ extern uint32_t wiixl_import__wiixl_core__HeapRemaining(void);
+ 
+-// Installs a hook on behalf of the calling module.
++// Installs a hook on behalf of the calling module. No owner parameter: a mod
++// could otherwise name itself anything, and the conflict report exists
++// precisely so that can't happen. The loader sets the current owner around a
++// module's entry.
+ //
+-// The owner is NOT a parameter, and that is deliberate: a mod could then name
+-// itself anything, and the conflict report - the entire reason the registry is
+-// central - would be worth nothing. The loader sets the current owner around a
+-// module's entry, so attribution comes from who the host is running, not from
+-// what the module claims.
++// Returns the address to call to continue the chain, or 0 if refused.
++// Ignoring the return value replaces the function; that's legal and
++// reported.
+ //
+-// Returns the address to call to continue the chain, or 0 if the hook was
+-// refused. A mod that ignores the return value and never calls it has replaced
+-// the function, which is legal and reported.
+-//
+-// THE SAME PLATFORM DISPATCH THE HOST USES, which this did not do.
+-//
+-// hook.hpp's InstallVia has always chosen per platform: the chain manager on
+-// Cemu, exlaunch on Switch, WUPS on Wii U - because Hooks::InstallHook emits
+-// PowerPC, and because its trampoline pool and cache flush are #if WIIXL_CEMU
+-// with the host-TEST fallback underneath. This function called the chain
+-// manager directly on every platform, so a module got the one path that cannot
+-// work anywhere but Cemu while the host beside it took the right one.
+-//
+-// On Switch that wrote `lis/ori/mtctr/bctr` into aarch64 code and the game died
+-// on 0x618C64B4. On Wii U it would have built trampolines in a non-executable
+-// static array and flushed nothing - the same bug, wearing the right ISA.
++// Dispatches per platform the same way hook.hpp's InstallVia does for host
++// hooks (Cemu's chain manager, exlaunch, WUPS) rather than calling the chain
++// manager unconditionally, which corrupted non-Cemu builds.
+ extern uintptr_t wiixl_import__wiixl_core__InstallHook(uintptr_t target, uintptr_t callback);
+ extern uintptr_t wiixl_import__wiixl_core__HookProbeTarget(void);
+ extern uint32_t wiixl_import__wiixl_core__HookProbeClaimTag(uint32_t tag);
+ extern void wiixl_import__wiixl_core__HookProbeMark(uint32_t tag);
+ 
+-// This module's own directory, and nothing outside it. The identity comes from
+-// the host - whichever module it is running - so a mod cannot read another
+-// mod's files by naming them.
++// Scoped to the calling module's own directory; identity comes from the
++// host, not a mod-supplied name, so a mod can't read another mod's files.
+ extern int32_t wiixl_import__wiixl_core__ModReadFile(const char* path, void* buffer, uint32_t maxSize);
+ extern uint32_t wiixl_import__wiixl_core__ModFileExists(const char* path);
+ 
+-// Game content, explicitly. Identical to ReadFile, which is retained only
+-// because removing a symbol would be a major bump - this is the name to use,
+-// because "GameReadFile" says at the call site what "ReadFile" left implied.
++// Game content, explicitly. Identical to ReadFile, kept as a separate name
++// because removing ReadFile would be a major bump.
+ extern int32_t wiixl_import__wiixl_core__GameReadFile(const char* path, void* buffer, uint32_t maxSize);
+ 
+-// Asks to be called once a frame.
+-//
+-// Returns 1 on success, 0 if refused - and the log names which of the four
+-// refusals it was. The callback is attributed to whichever module the host is
+-// running, never to anything passed here, so a hang inside a tick names the
+-// module that actually registered it.
+-//
+-// A host with no game module has no frame source and these never run; that is
+-// reported at the load point rather than left to be inferred from a mod that
+-// quietly does nothing.
++// Registers a per-frame callback. Returns 1 on success, 0 if refused (the
++// log names which of four reasons). Attributed to whichever module the host
++// is running, never to anything passed here.
+ extern uint32_t wiixl_import__wiixl_core__RegisterTick(void (*fn)());
+ }
+ 
+diff --git i/include/wiixlaunch/imports/wiixl_mem.h w/include/wiixlaunch/imports/wiixl_mem.h
+index 3c861aa..0dea9a7 100644
+--- i/include/wiixlaunch/imports/wiixl_mem.h
++++ w/include/wiixlaunch/imports/wiixl_mem.h
+@@ -20,8 +20,8 @@
+ extern "C" {
+ extern uint32_t wiixl_import__wiixl_mem__ShimsAvailable(void);
+ 
+-// heap: 0 MEM1, 1 MEM2, 2 FG - matching Mem::BaseHeap. Returned as an opaque
+-// address; a mod passes it back and never dereferences it.
++// heap: 0 MEM1, 1 MEM2, 2 FG (matching Mem::BaseHeap). Returned as an
++// opaque address a mod passes back and never dereferences.
+ extern uintptr_t wiixl_import__wiixl_mem__GetBaseHeapHandle(uint32_t heap);
+ extern uint32_t wiixl_import__wiixl_mem__GetAllocatableSize(uintptr_t heap, int32_t align);
+ extern uintptr_t wiixl_import__wiixl_mem__AllocFromExpHeap(uintptr_t heap, uint32_t size, int32_t align);
+diff --git i/include/wiixlaunch/imports/wiixl_patch.h w/include/wiixlaunch/imports/wiixl_patch.h
+index 752c16b..07df70f 100644
+--- i/include/wiixlaunch/imports/wiixl_patch.h
++++ w/include/wiixlaunch/imports/wiixl_patch.h
+@@ -19,28 +19,16 @@
+ 
+ extern "C" {
+ 
+-// 1 on success. 0 when the bytes at the address are not what the caller said
+-// they would be - which is the version guard doing its job, not a failure of
+-// this call.
+-// THROUGH THE PATCH REGISTRY, not past it.
+-//
+-// This used to verify the origin bytes and then write, recording nothing. So a
+-// runtime patch got one of the four checks a DECLARED patch gets: it could land
+-// inside the 16 bytes a hook displaced, or on top of another module's patch, or
+-// into the module arena, and none of those were looked at - while the surface
+-// sat next to Patches, which does all of them and names the other party.
+-//
+-// That gap is the reason a mod wanting a CONFIGURABLE patch had to choose
+-// between the collision report and the config: a declared patch cannot depend on
+-// a number read at runtime, and a runtime patch was unregistered. It no longer
+-// is - Patches::ApplyAt checks and records, so two mods rewriting the same
+-// instruction collide by name whichever way either of them wrote it.
++// 1 on success. 0 when the bytes at the address aren't what the caller
++// said - the version guard doing its job. Goes through Patches::ApplyAt
++// (not around it), so a runtime patch gets the same hooked-window and
++// patch-overlap checks a declared patch gets, and two mods rewriting the
++// same instruction collide by name either way.
+ extern uint32_t wiixl_import__wiixl_patch__Write(uintptr_t addr, const void* data, uint32_t size, const void* origin, uint32_t originSize);
+ extern uint32_t wiixl_import__wiixl_patch__WriteUnchecked(uintptr_t addr, const void* data, uint32_t size);
+ 
+-// Reads bytes back out of game memory, which is how a mod verifies its own
+-// write rather than trusting the return value. The sixth rule in
+-// docs/framework/modules.md, made available to mods.
++// Reads bytes back out of game memory, so a mod can verify its own write
++// rather than trust the return value.
+ extern uint32_t wiixl_import__wiixl_patch__Read(uintptr_t addr, void* out, uint32_t size);
+ }
+ 
+diff --git i/include/wiixlaunch/imports/wiixl_time.h w/include/wiixlaunch/imports/wiixl_time.h
+index 516f408..683de9b 100644
+--- i/include/wiixlaunch/imports/wiixl_time.h
++++ w/include/wiixlaunch/imports/wiixl_time.h
+@@ -19,21 +19,18 @@
+ 
+ extern "C" {
+ 
+-// int64 through two uint32s. A 64-bit value crosses this boundary perfectly
+-// well by ABI, but every other entry in every surface is 32-bit, and one call
+-// with a different width is one call whose calling convention has to be right
+-// in a place nobody would think to check.
++// int64 through two uint32s, matching every other 32-bit surface entry
++// rather than being the one call with a different calling-convention width.
+ extern void wiixl_import__wiixl_time__GetMonotonicTicks(uint32_t* hi, uint32_t* lo);
+ extern uint32_t wiixl_import__wiixl_time__TicksPerSecond(void);
+ extern uint32_t wiixl_import__wiixl_time__IsWallClockAvailable(void);
+ 
+-// The calendar, flattened. CalendarTime is a struct of ten ints and must not
+-// cross; the caller passes an int32[10] and the order is fixed here forever:
++// The calendar, flattened: a struct can't cross the surface boundary, so
++// the caller passes an int32[10] in this fixed order:
+ // sec, min, hour, mday, mon, year, wday, yday, msec, usec.
+ extern uint32_t wiixl_import__wiixl_time__GetCalendarTime(int32_t* out10);
+ 
+-// "2026-09-05 12:39:29" into a caller-owned buffer, because a mod has no
+-// formatter of its own and this is the one string every mod wants.
++// "2026-09-05 12:39:29" into a caller-owned buffer.
+ extern uint32_t wiixl_import__wiixl_time__FormatNow(char* out, uint32_t cap);
+ }
+ 
+diff --git i/include/wiixlaunch/imports/wiixl_version.h w/include/wiixlaunch/imports/wiixl_version.h
+index 22c198f..a7a9b20 100644
+--- i/include/wiixlaunch/imports/wiixl_version.h
++++ w/include/wiixlaunch/imports/wiixl_version.h
+@@ -20,14 +20,12 @@
+ extern "C" {
+ extern uint32_t wiixl_import__wiixl_version__Fingerprint(void);
+ 
+-// Null when unrecognised. NOT "unknown" as a string - a mod comparing names
+-// would match a build called "unknown" against every build nobody has enrolled,
+-// which is precisely the guess this whole mechanism exists to avoid.
++// Null when unrecognised, not the string "unknown" - a literal name would
++// let a mod match against every unenrolled build.
+ extern const char* wiixl_import__wiixl_version__Name(void);
+ 
+-// Whether this host can fingerprint at all. "No identity slice declared" and
+-// "declared, and this build is not one I know" are different answers, and a mod
+-// deciding what to do about its offsets needs to tell them apart.
++// Whether this host can fingerprint at all, distinct from "it can, and
++// this build isn't one it knows."
+ extern uint32_t wiixl_import__wiixl_version__Configured(void);
+ }
+ 
+diff --git i/sdk/include/wiixlaunch/imports/wiixl_call.h w/sdk/include/wiixlaunch/imports/wiixl_call.h
+index 31af92e..1e311cc 100644
+--- i/sdk/include/wiixlaunch/imports/wiixl_call.h
++++ w/sdk/include/wiixlaunch/imports/wiixl_call.h
+@@ -19,14 +19,12 @@
+ 
+ extern "C" {
+ 
+-// One offset per platform, and the host picks. A mod that hard-coded the Wii U
+-// address would be silently wrong on Switch; this way the wrong-platform case
+-// cannot arise at the call site at all.
++// One offset per platform, and the host picks, so the wrong-platform case
++// can't arise at the call site.
+ extern uintptr_t wiixl_import__wiixl_call__ResolveTarget(uintptr_t switchOffset, uintptr_t wiiuOffset);
+ 
+-// Where the image starts, for a mod doing its own arithmetic. Same value
+-// wiixl.core's ImageBase reports; here so a mod using wiixl.call does not have
+-// to declare wiixl.core as well for one number.
++// Same value wiixl.core's ImageBase reports; here so a mod using
++// wiixl.call doesn't have to declare wiixl.core too for one number.
+ extern uintptr_t wiixl_import__wiixl_call__ImageBase(void);
+ }
+ 
+diff --git i/sdk/include/wiixlaunch/imports/wiixl_core.h w/sdk/include/wiixlaunch/imports/wiixl_core.h
+index 905b05a..cc92f7c 100644
+--- i/sdk/include/wiixlaunch/imports/wiixl_core.h
++++ w/sdk/include/wiixlaunch/imports/wiixl_core.h
+@@ -19,98 +19,56 @@
+ 
+ extern "C" {
+ 
+-//
+-// Deliberately NOT varargs. A mod formats its own text and hands over a
+-// finished string; the host's formatter and the mod's need not agree, and a
+-// vararg mismatch across this boundary is not diagnosable.
++// Not varargs: a mod formats its own text and hands over a finished string,
++// so a vararg mismatch across the host/mod boundary can't happen.
+ extern void wiixl_import__wiixl_core__Log(const char* text);
+ extern uint32_t wiixl_import__wiixl_core__AbiVersion(void);
+ 
+-// Bytes from the host heap. Never freed, matching every other allocator in
+-// this project. Stage 5 replaces the implementation with a per-module
+-// sub-arena; the signature does not change, which is the point of routing mod
+-// allocation through a surface now rather than letting mods call the backend.
++// Through the arena, so the allocation is charged to and bounded by the
++// calling module's own grant.
+ extern void* wiixl_import__wiixl_core__Alloc(uint32_t size, uint32_t align);
+ 
+-// Reads a whole file from game content. Returns bytes read, or a negative value
+-// on failure. `outRead` may be null.
+-//
+-// The v1.0 spelling of GameReadFile, kept resolvable for mods built against it.
++// The v1.0 spelling of GameReadFile, kept resolvable for old mods.
+ extern int32_t wiixl_import__wiixl_core__ReadFile(const char* path, void* buffer, uint32_t maxSize);
+-
+-// Does a path exist and open? Cheap existence check that does not need a
+-// buffer, for a mod deciding whether an optional asset is present.
+ extern uint32_t wiixl_import__wiixl_core__FileExists(const char* path);
+-
+-// The code cave base, so a mod can reason about where it is. Opaque to the mod
+-// beyond being an address.
+ extern uintptr_t wiixl_import__wiixl_core__ImageBase(void);
+ 
+-//
+-// How much this module was actually granted, how much it has spent, and how
+-// much is left. Callable DURING the load phase, before allocating.
+-//
+-// A module on the best-effort path (heapRequest == 0) is told what it got
+-// rather than having to discover it by allocating until null. "Allocate until
+-// null" is not a design; it is finding out by failing, in a place where failing
+-// means a half-initialised mod running in someone's game.
+-//
+-// A module that stated a heapRequest already knows its size, but not what it
+-// has spent, so all three are useful to both.
++// Granted/used/remaining for the calling module's arena. Callable during
++// load, before allocating, so a best-effort module can size a buffer instead
++// of discovering its limit by allocating until null.
+ extern uint32_t wiixl_import__wiixl_core__HeapGranted(void);
+ extern uint32_t wiixl_import__wiixl_core__HeapUsed(void);
+ extern uint32_t wiixl_import__wiixl_core__HeapRemaining(void);
+ 
+-// Installs a hook on behalf of the calling module.
++// Installs a hook on behalf of the calling module. No owner parameter: a mod
++// could otherwise name itself anything, and the conflict report exists
++// precisely so that can't happen. The loader sets the current owner around a
++// module's entry.
+ //
+-// The owner is NOT a parameter, and that is deliberate: a mod could then name
+-// itself anything, and the conflict report - the entire reason the registry is
+-// central - would be worth nothing. The loader sets the current owner around a
+-// module's entry, so attribution comes from who the host is running, not from
+-// what the module claims.
++// Returns the address to call to continue the chain, or 0 if refused.
++// Ignoring the return value replaces the function; that's legal and
++// reported.
+ //
+-// Returns the address to call to continue the chain, or 0 if the hook was
+-// refused. A mod that ignores the return value and never calls it has replaced
+-// the function, which is legal and reported.
+-//
+-// THE SAME PLATFORM DISPATCH THE HOST USES, which this did not do.
+-//
+-// hook.hpp's InstallVia has always chosen per platform: the chain manager on
+-// Cemu, exlaunch on Switch, WUPS on Wii U - because Hooks::InstallHook emits
+-// PowerPC, and because its trampoline pool and cache flush are #if WIIXL_CEMU
+-// with the host-TEST fallback underneath. This function called the chain
+-// manager directly on every platform, so a module got the one path that cannot
+-// work anywhere but Cemu while the host beside it took the right one.
+-//
+-// On Switch that wrote `lis/ori/mtctr/bctr` into aarch64 code and the game died
+-// on 0x618C64B4. On Wii U it would have built trampolines in a non-executable
+-// static array and flushed nothing - the same bug, wearing the right ISA.
++// Dispatches per platform the same way hook.hpp's InstallVia does for host
++// hooks (Cemu's chain manager, exlaunch, WUPS) rather than calling the chain
++// manager unconditionally, which corrupted non-Cemu builds.
+ extern uintptr_t wiixl_import__wiixl_core__InstallHook(uintptr_t target, uintptr_t callback);
+ extern uintptr_t wiixl_import__wiixl_core__HookProbeTarget(void);
+ extern uint32_t wiixl_import__wiixl_core__HookProbeClaimTag(uint32_t tag);
+ extern void wiixl_import__wiixl_core__HookProbeMark(uint32_t tag);
+ 
+-// This module's own directory, and nothing outside it. The identity comes from
+-// the host - whichever module it is running - so a mod cannot read another
+-// mod's files by naming them.
++// Scoped to the calling module's own directory; identity comes from the
++// host, not a mod-supplied name, so a mod can't read another mod's files.
+ extern int32_t wiixl_import__wiixl_core__ModReadFile(const char* path, void* buffer, uint32_t maxSize);
+ extern uint32_t wiixl_import__wiixl_core__ModFileExists(const char* path);
+ 
+-// Game content, explicitly. Identical to ReadFile, which is retained only
+-// because removing a symbol would be a major bump - this is the name to use,
+-// because "GameReadFile" says at the call site what "ReadFile" left implied.
++// Game content, explicitly. Identical to ReadFile, kept as a separate name
++// because removing ReadFile would be a major bump.
+ extern int32_t wiixl_import__wiixl_core__GameReadFile(const char* path, void* buffer, uint32_t maxSize);
+ 
+-// Asks to be called once a frame.
+-//
+-// Returns 1 on success, 0 if refused - and the log names which of the four
+-// refusals it was. The callback is attributed to whichever module the host is
+-// running, never to anything passed here, so a hang inside a tick names the
+-// module that actually registered it.
+-//
+-// A host with no game module has no frame source and these never run; that is
+-// reported at the load point rather than left to be inferred from a mod that
+-// quietly does nothing.
++// Registers a per-frame callback. Returns 1 on success, 0 if refused (the
++// log names which of four reasons). Attributed to whichever module the host
++// is running, never to anything passed here.
+ extern uint32_t wiixl_import__wiixl_core__RegisterTick(void (*fn)());
+ }
+ 
+diff --git i/sdk/include/wiixlaunch/imports/wiixl_mem.h w/sdk/include/wiixlaunch/imports/wiixl_mem.h
+index 3c861aa..0dea9a7 100644
+--- i/sdk/include/wiixlaunch/imports/wiixl_mem.h
++++ w/sdk/include/wiixlaunch/imports/wiixl_mem.h
+@@ -20,8 +20,8 @@
+ extern "C" {
+ extern uint32_t wiixl_import__wiixl_mem__ShimsAvailable(void);
+ 
+-// heap: 0 MEM1, 1 MEM2, 2 FG - matching Mem::BaseHeap. Returned as an opaque
+-// address; a mod passes it back and never dereferences it.
++// heap: 0 MEM1, 1 MEM2, 2 FG (matching Mem::BaseHeap). Returned as an
++// opaque address a mod passes back and never dereferences.
+ extern uintptr_t wiixl_import__wiixl_mem__GetBaseHeapHandle(uint32_t heap);
+ extern uint32_t wiixl_import__wiixl_mem__GetAllocatableSize(uintptr_t heap, int32_t align);
+ extern uintptr_t wiixl_import__wiixl_mem__AllocFromExpHeap(uintptr_t heap, uint32_t size, int32_t align);
+diff --git i/sdk/include/wiixlaunch/imports/wiixl_patch.h w/sdk/include/wiixlaunch/imports/wiixl_patch.h
+index 752c16b..07df70f 100644
+--- i/sdk/include/wiixlaunch/imports/wiixl_patch.h
++++ w/sdk/include/wiixlaunch/imports/wiixl_patch.h
+@@ -19,28 +19,16 @@
+ 
+ extern "C" {
+ 
+-// 1 on success. 0 when the bytes at the address are not what the caller said
+-// they would be - which is the version guard doing its job, not a failure of
+-// this call.
+-// THROUGH THE PATCH REGISTRY, not past it.
+-//
+-// This used to verify the origin bytes and then write, recording nothing. So a
+-// runtime patch got one of the four checks a DECLARED patch gets: it could land
+-// inside the 16 bytes a hook displaced, or on top of another module's patch, or
+-// into the module arena, and none of those were looked at - while the surface
+-// sat next to Patches, which does all of them and names the other party.
+-//
+-// That gap is the reason a mod wanting a CONFIGURABLE patch had to choose
+-// between the collision report and the config: a declared patch cannot depend on
+-// a number read at runtime, and a runtime patch was unregistered. It no longer
+-// is - Patches::ApplyAt checks and records, so two mods rewriting the same
+-// instruction collide by name whichever way either of them wrote it.
++// 1 on success. 0 when the bytes at the address aren't what the caller
++// said - the version guard doing its job. Goes through Patches::ApplyAt
++// (not around it), so a runtime patch gets the same hooked-window and
++// patch-overlap checks a declared patch gets, and two mods rewriting the
++// same instruction collide by name either way.
+ extern uint32_t wiixl_import__wiixl_patch__Write(uintptr_t addr, const void* data, uint32_t size, const void* origin, uint32_t originSize);
+ extern uint32_t wiixl_import__wiixl_patch__WriteUnchecked(uintptr_t addr, const void* data, uint32_t size);
+ 
+-// Reads bytes back out of game memory, which is how a mod verifies its own
+-// write rather than trusting the return value. The sixth rule in
+-// docs/framework/modules.md, made available to mods.
++// Reads bytes back out of game memory, so a mod can verify its own write
++// rather than trust the return value.
+ extern uint32_t wiixl_import__wiixl_patch__Read(uintptr_t addr, void* out, uint32_t size);
+ }
+ 
+diff --git i/sdk/include/wiixlaunch/imports/wiixl_time.h w/sdk/include/wiixlaunch/imports/wiixl_time.h
+index 516f408..683de9b 100644
+--- i/sdk/include/wiixlaunch/imports/wiixl_time.h
++++ w/sdk/include/wiixlaunch/imports/wiixl_time.h
+@@ -19,21 +19,18 @@
+ 
+ extern "C" {
+ 
+-// int64 through two uint32s. A 64-bit value crosses this boundary perfectly
+-// well by ABI, but every other entry in every surface is 32-bit, and one call
+-// with a different width is one call whose calling convention has to be right
+-// in a place nobody would think to check.
++// int64 through two uint32s, matching every other 32-bit surface entry
++// rather than being the one call with a different calling-convention width.
+ extern void wiixl_import__wiixl_time__GetMonotonicTicks(uint32_t* hi, uint32_t* lo);
+ extern uint32_t wiixl_import__wiixl_time__TicksPerSecond(void);
+ extern uint32_t wiixl_import__wiixl_time__IsWallClockAvailable(void);
+ 
+-// The calendar, flattened. CalendarTime is a struct of ten ints and must not
+-// cross; the caller passes an int32[10] and the order is fixed here forever:
++// The calendar, flattened: a struct can't cross the surface boundary, so
++// the caller passes an int32[10] in this fixed order:
+ // sec, min, hour, mday, mon, year, wday, yday, msec, usec.
+ extern uint32_t wiixl_import__wiixl_time__GetCalendarTime(int32_t* out10);
+ 
+-// "2026-09-05 12:39:29" into a caller-owned buffer, because a mod has no
+-// formatter of its own and this is the one string every mod wants.
++// "2026-09-05 12:39:29" into a caller-owned buffer.
+ extern uint32_t wiixl_import__wiixl_time__FormatNow(char* out, uint32_t cap);
+ }
+ 
+diff --git i/sdk/include/wiixlaunch/imports/wiixl_version.h w/sdk/include/wiixlaunch/imports/wiixl_version.h
+index 22c198f..a7a9b20 100644
+--- i/sdk/include/wiixlaunch/imports/wiixl_version.h
++++ w/sdk/include/wiixlaunch/imports/wiixl_version.h
+@@ -20,14 +20,12 @@
+ extern "C" {
+ extern uint32_t wiixl_import__wiixl_version__Fingerprint(void);
+ 
+-// Null when unrecognised. NOT "unknown" as a string - a mod comparing names
+-// would match a build called "unknown" against every build nobody has enrolled,
+-// which is precisely the guess this whole mechanism exists to avoid.
++// Null when unrecognised, not the string "unknown" - a literal name would
++// let a mod match against every unenrolled build.
+ extern const char* wiixl_import__wiixl_version__Name(void);
+ 
+-// Whether this host can fingerprint at all. "No identity slice declared" and
+-// "declared, and this build is not one I know" are different answers, and a mod
+-// deciding what to do about its offsets needs to tell them apart.
++// Whether this host can fingerprint at all, distinct from "it can, and
++// this build isn't one it knows."
+ extern uint32_t wiixl_import__wiixl_version__Configured(void);
+ }
+ 
+diff --git i/sdk/scripts/aarch64_relocs.py w/sdk/scripts/aarch64_relocs.py
+index d9fbe08..f0501ed 100644
+--- i/sdk/scripts/aarch64_relocs.py
++++ w/sdk/scripts/aarch64_relocs.py
+@@ -1,31 +1,5 @@
+ #!/usr/bin/env python3
+-"""Parsing AArch64 relocations out of readelf, for .wxlm modules.
+-
+-The PowerPC counterpart is scripts/ppc_relocs.py and the two are deliberately
+-NOT merged. They share a shape - read `readelf -rW`, hand back records - and
+-almost nothing else: PowerPC needs four fixup kinds because a 32-bit address is
+-built from instruction halves, while AArch64 needs exactly one, because
+-everything else it does with an address is PC-relative.
+-
+-WHY ONE KIND IS ENOUGH, and it is the whole design:
+-
+-  * A64 code reaches its own data with `adrp` + `add`/`ldr :lo12:`. Both are
+-    PC-relative, the linker has already resolved them, and they stay correct
+-    when the image moves PROVIDED it moves by a whole number of pages. The
+-    loader page-aligns aarch64 images for exactly this reason; nothing here has
+-    to fix them up, and nothing could - there is no runtime information in an
+-    adrp that says which symbol it meant.
+-  * Branches (CALL26/JUMP26/CONDBR19/TSTBR14) are PC-relative within the module
+-    and likewise survive the move untouched.
+-  * What is left is absolute 64-bit data: vtables, function pointer tables,
+-    .init_array entries, and the import pointers a mod declares. Those are
+-    R_AARCH64_ABS64 and those are what the loader fixes.
+-
+-ANYTHING NOT ON THE LIST IS AN ERROR, not a skip. A relocation silently ignored
+-is a wrong pointer at runtime with no diagnostic anywhere, which is the failure
+-shape this project keeps paying for. If a compiler change starts emitting
+-something new, this stops the build and names it.
+-"""
++"""Parsing AArch64 relocations out of readelf, for .wxlm modules."""
+ 
+ import re
+ import subprocess
+@@ -34,10 +8,7 @@ import subprocess
+ # Absolute, and therefore the loader's problem.
+ ABS64 = "R_AARCH64_ABS64"
+ 
+-# PC-relative or already-resolved-within-the-module: correct after a
+-# page-aligned move, so they need no runtime fixup. Listed BY NAME rather than
+-# skipped by default, so that "we considered this and it needs nothing" is
+-# distinguishable from "we have never seen this".
++# PC-relative or already-resolved relocations that need no runtime fixup.
+ _NO_FIXUP = frozenset([
+     # Code addressing a symbol: adrp gives the page, one of these adds the rest.
+     "R_AARCH64_ADR_PREL_PG_HI21",
+@@ -58,7 +29,7 @@ _NO_FIXUP = frozenset([
+     "R_AARCH64_PREL16",
+     "R_AARCH64_PREL32",
+     "R_AARCH64_PREL64",
+-    # Emitted for unwind tables and the like; nothing executes them.
++    # Emitted for unwind tables and metadata.
+     "R_AARCH64_NONE",
+     "R_AARCH64_NULL",
+ ])
+@@ -86,15 +57,7 @@ class Reloc:
+ 
+ 
+ def read(readelf_cmd, elf_path, skip_debug=True):
+-    """Every relocation in `elf_path`, ABS64 and no-fixup alike.
+-
+-    The caller decides what to do with each; returning the no-fixup ones too is
+-    what lets it tell an unknown type from an ignorable one.
+-
+-    Debug sections are skipped for the same reason as on PowerPC: their offsets
+-    are relative to the debug section rather than to the flat image, so acting
+-    on one corrupts an unrelated word of the payload.
+-    """
++    """Every relocation in `elf_path`, ABS64 and no-fixup alike."""
+     out = subprocess.check_output([readelf_cmd, "-rW", elf_path], text=True)
+     relocs = []
+     section = ""
+@@ -128,9 +91,7 @@ def read(readelf_cmd, elf_path, skip_debug=True):
+                 sym_value = 0
+         if len(parts) >= 5:
+             sym_name = parts[4]
+-            # "Sym.Name + Addend", where readelf writes the addend last. The
+-            # PowerPC module lost exactly this once and every string literal in
+-            # the first module ever loaded pointed at its section base.
++            # "Sym.Name + Addend", where readelf writes the addend last.
+             if len(parts) >= 6 and parts[-2] in ("+", "-"):
+                 try:
+                     addend = int(parts[-1], 16)
+@@ -157,10 +118,3 @@ def needs_fixup(rtype):
+ 
+ def is_known(rtype):
+     return rtype == ABS64 or rtype in _NO_FIXUP
+-
+-
+-# There is deliberately no read_undefined_symbols here. Finding the symbols an
+-# ELF references without defining is symbol-table parsing with nothing
+-# architecture-specific in it, and ppc_relocs.read_undefined_symbols already
+-# does it for deploy.py. A second copy would be a second thing to get wrong -
+-# which is the exact mistake ppc_relocs.py's own header records.
+diff --git i/sdk/scripts/build_mod.py w/sdk/scripts/build_mod.py
+index b2048b9..eeb41c1 100644
+--- i/sdk/scripts/build_mod.py
++++ w/sdk/scripts/build_mod.py
+@@ -1,30 +1,13 @@
+ #!/usr/bin/env python3
+-"""Builds a .wxlm module from a source directory, in or out of this tree.
++"""Builds a .wxlm module from a source directory.
+ 
++Usage:
+     python scripts/build_mod.py --source examples/hook_mod_a --id a_first
+     python scripts/build_mod.py --source . --id botw_api --wiixlaunch ../WiiXLaunch
+ 
+-THIS IS THE ONLY DEFINITION OF HOW A MODULE IS BUILT. build_cemu calls it for
+-the in-tree samples and an external project calls it for its own, so the flags,
+-the linker script and the packing step cannot drift between them.
+-
+-That mattered enough to write down: the flags are not obvious and getting one
+-wrong fails in ways that do not look like a flag problem. -fno-pie/-fno-pic
+-because this toolchain emits GOT-indirect addressing under -fPIE that the
+-relocator does not handle; -nostdlib with -lgcc anyway because GCC emits calls
+-to libgcc's PowerPC register save/restore helpers and wxlm.py rejects a module
+-with undefined symbols; --unresolved-symbols=ignore-all because a module's
+-imports are DELIBERATELY undefined and are resolved at load through the surface
+-registry. A second copy of that list would eventually disagree with this one,
+-and the disagreement would show up as a module that loads and misbehaves.
+-
+-WHAT A MODULE SOURCE DIRECTORY LOOKS LIKE:
+-
+-    <source>/mod.cpp     the module (required; --entry-file to rename)
+-    <source>/data/       optional; deployed to mods/<id>/ on the target
+-
+-The output is <out>/<id>.wxlm plus <out>/moddata/<id>/ for the resources, which
+-is the layout scripts/deploy.py expects.
++Expected module source directory layout:
++    <source>/mod.cpp     module entry (required; --entry-file to rename)
++    <source>/data/       optional; deployed to mods/<id>/ on target
+ """
+ 
+ import argparse
+@@ -38,14 +21,7 @@ import sys
+ HERE = os.path.dirname(os.path.abspath(__file__))
+ DEFAULT_ROOT = os.path.dirname(HERE)
+ 
+-
+-# Everything that differs between the two architectures a .wxlm can be built
+-# for, in one place. A mod's SOURCE does not change between them - it names
+-# surfaces, not platforms - so this is the whole of the difference.
+-#
+-# -msdata=none is PowerPC-only and is not merely unnecessary on aarch64, it is
+-# rejected. That is the shape of most of this table: not a preference, a fact
+-# about the toolchain.
++# Target platform architecture and toolchain definitions.
+ TARGETS = {
+     "cemu": {
+         "machine":  "ppc32",
+@@ -65,25 +41,13 @@ TARGETS = {
+         "prefix":   "aarch64-none-elf-",
+         "linker":   "wxlm_mod_aarch64.ld",
+         "defines":  ["__SWITCH__=1", "WIIXL_SWITCH=1"],
+-        # Small code model: adrp+add reaches +/-4 GB, which is more than a
+-        # module and its own data will ever span, and it is what keeps the
+-        # relocation set down to one absolute kind.
+         "arch":     ["-mcmodel=small"],
+         "toolchain": "devkitA64",
+-        # NOT "switch". In this repository build/switch/ is the HOST's - it is
+-        # where build_switch.bat writes subsdk9 and main.npdm and where
+-        # deploy.py reads them from - and a mod build with no --out lands in
+-        # build/ too. They cannot actually clobber each other, since the host's
+-        # files have fixed names and a mod's are <id>.elf/<id>.wxlm, but one
+-        # directory holding both is how you end up staring at a folder
+-        # wondering which half of it you just built.
+         "subdir":   "switch-mods",
+     },
+ }
+ 
+-# Wii U is absent on purpose rather than by oversight: it is the same PowerPC
+-# module the Cemu target produces, byte for byte, because a .wxlm names surfaces
+-# and neither the code nor the format knows which of the two is running it.
++# Wii U runs the same PowerPC module as Cemu.
+ 
+ 
+ def find_gxx(target):
+@@ -163,20 +127,9 @@ def read_manifest(source):
+ 
+ 
+ # --- editor integration -----------------------------------------------------
+-#
+-# A mod is a folder somewhere with no build system in it, which is fine for the
+-# compiler and useless for an editor: nothing tells clangd or the VS Code C/C++
+-# extension where <wiixlaunch/imports/...> lives, what the target is, or which
+-# macros are set, so every include is red and no symbol resolves.
+-#
+-# The build already knows all of it - it constructs the exact command. So it
+-# writes that command out in the two formats editors read, every time it runs.
+-# No configuration to keep in sync, because the thing being written IS the
+-# command that just compiled.
+ def write_ide_files(source, cmd, mod_cpp, includes, gxx):
+     """compile_commands.json for clangd, c_cpp_properties.json for VS Code."""
+-    # compile_commands.json: the compile step only. The link flags in `cmd` are
+-    # not something an indexer should see, and -T/-nostdlib confuse some of them.
++    # Strip link flags before emitting compile commands for indexers.
+     compile_only = [a for a in cmd
+                     if a not in ("-nostartfiles", "-nostdlib", "-Wl,-q",
+                                  "-Wl,--unresolved-symbols=ignore-all", "-lgcc")]
+@@ -295,10 +248,7 @@ def main():
+                     help="bytes this module requires; omitted means best effort")
+     ap.add_argument("--include", action="append", default=[],
+                     help="extra include directory; repeatable")
+-    # Required surfaces are DERIVED from the imports at v1.0, which is right
+-    # almost always. This is for the case it is not: a symbol that only exists
+-    # from a later minor, where resolving against an older host would leave the
+-    # mod running with a call it cannot make. Repeatable, <surface>@<major>.<minor>.
++    # Overrides derived v1.0 floor when a symbol requires a later minor version.
+     ap.add_argument("--require", dest="requires", action="append", default=[],
+                     help="require a surface at a minimum version, e.g. botw.map@1.1")
+     ap.add_argument("--init", metavar="DIR",
+@@ -315,17 +265,7 @@ def main():
+     root = os.path.abspath(args.wiixlaunch)
+     source = os.path.abspath(args.source)
+ 
+-    # Where output goes when nobody says.
+-    #
+-    # In the framework tree that is <root>/build, because deploy.py collects
+-    # from there and the in-tree samples are part of the host's own build.
+-    #
+-    # From an SDK it is <mod>/build instead. An SDK is somebody's installed
+-    # toolchain, not their workspace: writing their module into it would put
+-    # build artifacts inside the thing they downloaded, and leave the answer to
+-    # "where did my .wxlm go" somewhere they have no reason to look. sdk.json is
+-    # only ever written by make_sdk.py, so its presence is what distinguishes
+-    # the two.
++    # In framework tree: default to <root>/build. In an SDK: default to <mod>/build.
+     if args.out:
+         out = os.path.abspath(args.out)
+     elif os.path.exists(os.path.join(root, "sdk.json")):
+@@ -337,9 +277,7 @@ def main():
+     if manifest is None:
+         return 1
+ 
+-    # The command line wins, so a one-off build can override without editing the
+-    # mod - but it says which value came from where, because a flag silently
+-    # shadowing a manifest is how you debug the wrong file for twenty minutes.
++    # CLI flags override manifest values.
+     def settle(flag_value, key, default):
+         if flag_value is not None:
+             if key in manifest and str(manifest[key]) != str(flag_value):
+@@ -358,13 +296,8 @@ def main():
+             % (target, "".join("    %-8s %s\n" % (k, v["toolchain"])
+                                for k, v in sorted(TARGETS.items()))))
+         return 1
+-    # Lists ACCUMULATE rather than override: a manifest listing what the mod
+-    # needs and a command line adding one more are not in conflict.
++    # Accumulate list values from manifest and CLI.
+     includes_cfg = list(manifest.get("include", [])) + list(args.include)
+-    # A mod of any size has more than one .cpp. This built exactly the entry
+-    # file until a 2,000-line mod arrived in two translation units, linked
+-    # cleanly because imports are allowed to stay undefined, and packed a call
+-    # to a function that was never compiled.
+     sources_cfg = list(manifest.get("sources", []))
+     requires_cfg = list(manifest.get("require", [])) + list(args.requires)
+ 
+@@ -378,9 +311,7 @@ def main():
+               (MANIFEST, mod_id, phase,
+                ", %d required surface(s)" % len(requires_cfg) if requires_cfg else ""))
+ 
+-    # A module id is what its resource directory is named, so the loader's rule
+-    # about the reserved namespace applies here too - and finding out at build
+-    # time costs a script run rather than a boot that refuses the module.
++    # Ids beginning with '_' are reserved for the host (e.g. mods/_host/).
+     if mod_id.startswith("_"):
+         sys.stderr.write(
+             "[build_mod] '%s' is in the host's reserved id space.\n"
+@@ -425,9 +356,6 @@ def main():
+             % (tcfg["prefix"], tcfg["env"], tcfg["toolchain"]))
+         return 1
+ 
+-    # Each target gets its own output directory. The FILENAME stays <id>.wxlm on
+-    # both, because that is the name the module is deployed under wherever it
+-    # ends up - and because a Switch module and a Cemu one are the same mod.
+     if tcfg["subdir"]:
+         out = os.path.join(out, tcfg["subdir"])
+     os.makedirs(out, exist_ok=True)
+@@ -435,26 +363,15 @@ def main():
+     wxlm = os.path.join(out, mod_id + ".wxlm")
+ 
+     includes = [os.path.join(root, "include")]
+-    # A module may sit next to headers of its own.
+     if os.path.isdir(os.path.join(source, "include")):
+         includes.append(os.path.join(source, "include"))
+-    # A manifest's include path is relative to the MOD, not to the shell's
+-    # working directory - the manifest travels with the mod and the cwd does not.
++    # Manifest include paths are relative to the mod directory.
+     includes += [i if os.path.isabs(i) else os.path.join(source, i)
+                  for i in includes_cfg]
+ 
+     cmd = [gxx,
+            "-std=gnu++20", "-fno-pie", "-fno-pic", "-Os",
+            "-ffreestanding", "-fno-exceptions", "-fno-rtti",
+-           # WARNINGS, which this compiled without entirely until a real bug
+-           # walked past every one of them: the BotW API server had
+-           #     if (IsWrite(req)) { ... } else if (IsWrite(req)) { ... }
+-           # so the second arm was unreachable and three of its routes had
+-           # never once run. -Wduplicated-cond names that exact shape.
+-           #
+-           # Warnings, not errors. A mod is somebody else's code and failing
+-           # their build over style is not this tool's business - but saying
+-           # nothing at all was not either.
+            "-Wall", "-Wextra", "-Wduplicated-cond", "-Wduplicated-branches",
+            "-Wno-unused-parameter", "-Wno-unused-function"]
+     cmd += tcfg["arch"]
+@@ -465,8 +382,7 @@ def main():
+             "-Wl,--unresolved-symbols=ignore-all",
+             mod_cpp] + extra_cpp + ["-lgcc", "-o", elf]
+ 
+-    # Before compiling, so the editor is configured even if the code does not
+-    # build yet - which is exactly when you most want the editor working.
++    # Configure editor files before compile so IDE works even if build fails.
+     write_ide_files(source, cmd, mod_cpp, includes, gxx)
+ 
+     r = subprocess.run(cmd)
+@@ -484,14 +400,9 @@ def main():
+     if r.returncode != 0:
+         return 1
+ 
+-    # The path, because it is not always where you would guess: a target with
+-    # its own subdirectory puts it one level down, and the output above names
+-    # the file without saying where it landed.
+     print("[build_mod] %s" % wxlm)
+ 
+-    # Resources, staged where deploy.py looks for them. Cleared first: a
+-    # directory left from a renamed or removed file would otherwise ship
+-    # forever, which is the same staleness deploy.py guards against for .wxlm.
++    # Stage resources where deploy.py looks for them.
+     data_src = os.path.join(source, "data")
+     staged = os.path.join(out, "moddata", mod_id)
+     if os.path.isdir(staged):
+@@ -499,11 +410,6 @@ def main():
+     if os.path.isdir(data_src):
+         shutil.copytree(data_src, staged)
+         files = sum(len(f) for _r, _d, f in os.walk(staged))
+-        # mod_id, not args.id - which is None unless --id was passed on the
+-        # command line, and it usually is not: the id comes from mod.json.
+-        # The PATH above always used mod_id, so the files went to the right
+-        # place and only the line saying so was wrong. It read
+-        # "None: staged 1 resource file(s) for mods/None/" on every build.
+         print("[build_mod] %s: staged %d resource file(s) for mods/%s/"
+               % (mod_id, files, mod_id))
+ 
+diff --git i/sdk/scripts/ppc_relocs.py w/sdk/scripts/ppc_relocs.py
+index c484374..980ef32 100644
+--- i/sdk/scripts/ppc_relocs.py
++++ w/sdk/scripts/ppc_relocs.py
+@@ -1,32 +1,10 @@
+ #!/usr/bin/env python3
+-"""Parsing PowerPC relocations out of readelf, for the host and for modules.
+-
+-ONE implementation, imported by both scripts/deploy.py (the host payload) and
+-scripts/wxlm.py (.wxlm modules), because they are the same problem and a second
+-implementation is a second thing to get wrong.
+-
+-It was already gotten wrong once, in exactly the way duplication invites.
+-wxlm.py said in its own comments that it reused deploy.py's logic; it did not,
+-it reimplemented it, and it dropped the ADDEND. Every R_PPC_ADDR16_HA/LO pair
+-then resolved to its section's base address instead of the symbol it named, so
+-in the first module ever loaded every string literal pointed at the first string
+-in .rodata - the module ran, called its logger six times, and printed the same
+-line five times over. Nothing crashed. The count was right. Only the content was
+-wrong, which is the hardest kind of failure to see.
+-
+-WHY THE HALVES CARRY S+A RATHER THAN BEING PATCHED IN PLACE. An R_PPC_ADDR32
+-site already holds its own base-0 target, so the value can be read back out of
+-the payload and rebased. A 16-bit half cannot: it is half an address, and HA
+-additionally folds in a sign-extension carry from the low half. So each half
+-entry carries the relocation's own fully-resolved S+Addend, and the target is
+-recomputed from scratch at load time against S+Addend+base.
+-"""
++"""Parsing PowerPC relocations out of readelf, for the host and modules."""
+ 
+ import re
+ import subprocess
+ 
+-# The relocation kinds that become runtime fixups, and the kind code each maps
+-# to in the (kind << 24 | offset, value) encoding both emitters produce.
++# Relocation fixup kinds: (kind << 24 | offset, value).
+ KIND_ADDR32 = 0
+ KIND_HA = 1
+ KIND_HI = 2
+@@ -73,13 +51,7 @@ class Reloc:
+ 
+ 
+ def read(readelf_cmd, elf_path, skip_debug=True):
+-    """Every relocation in `elf_path` that could become a runtime fixup.
+-
+-    Debug sections are skipped by default. They carry R_PPC_ADDR32 relocations
+-    whose offsets are relative to the debug section, not the flat binary, so
+-    applying them corrupts arbitrary words of the payload - which happened once,
+-    and the resulting garbage jump crashed Cemu's recompiler at boot.
+-    """
++    """Every relocation in `elf_path` that could become a runtime fixup."""
+     out = subprocess.check_output([readelf_cmd, "-rW", elf_path], text=True)
+     relocs = []
+     section = ""
+@@ -115,8 +87,7 @@ def read(readelf_cmd, elf_path, skip_debug=True):
+                 sym_value = 0
+         if len(parts) >= 5:
+             sym_name = parts[4]
+-            # "Sym.Name + Addend" (or "- Addend"): the addend is the last token,
+-            # and dropping it is the bug this module exists to prevent.
++            # "Sym.Name + Addend" (or "- Addend").
+             if len(parts) >= 6 and parts[-2] in ("+", "-"):
+                 sign = -1 if parts[-2] == "-" else 1
+                 try:
+diff --git i/sdk/scripts/wxlm.py w/sdk/scripts/wxlm.py
+index c7a2465..411cda1 100644
+--- i/sdk/scripts/wxlm.py
++++ w/sdk/scripts/wxlm.py
+@@ -1,16 +1,5 @@
+ #!/usr/bin/env python3
+-"""Writes .wxlm module files.
+-
+-This is one half of a contract; the other is
+-include/wiixlaunch/loader/wxlm.hpp. A drift between them is the one failure
+-neither side can detect at runtime - the loader would read a plausible garbage
+-offset and relocate into it - so the layout below is asserted against that
+-header by scripts/test_wxlm.py, which parses the static_asserts out of it.
+-
+-The relocation extraction is deliberately the same logic scripts/deploy.py uses
+-for the host itself: same readelf parsing, same (kind << 24 | offset, value)
+-encoding. A module and the host are the same kind of object, so they get the
+-same emitter rather than two that drift.
++"""Writes .wxlm module files from compiled ELFs.
+ 
+ Usage:
+     python scripts/wxlm.py <input.elf> <output.wxlm> --id <mod-id> [options]
+@@ -45,14 +34,7 @@ IMPORT_ENTRY_SIZE = 16
+ EXPORT_ENTRY_SIZE = 12
+ REQUIRED_ENTRY_SIZE = 8
+ 
+-# Header field order. Keep in step with the struct.
+-#
+-# The BYTE ORDER is a parameter now, not a property of the format: a PPC32
+-# module is big-endian and an AArch64 one is little-endian, and the loader
+-# checks the header's endian field against its own before it overlays a single
+-# structure. Everything the writer packs - header, relocations, imports,
+-# exports, required surfaces - uses the same order, because a file with two
+-# orders in it is unreadable by anything.
++# Header field order matching include/wiixlaunch/loader/wxlm.hpp.
+ HEADER_BODY = (
+     "I"      # magic
+     "H"      # formatVersion
+@@ -143,11 +125,7 @@ class StringBlob:
+         return bytes(self._data)
+ 
+ 
+-# Where each toolchain's binutils live, and what its tools are called. Two
+-# entries rather than a general search: naming the two supported architectures
+-# means an unsupported one fails with "no toolchain for X" instead of quietly
+-# finding whichever cross-readelf happens to be on PATH and producing a module
+-# for the wrong machine.
++# Toolchain binutils configuration for supported target architectures.
+ _TOOLCHAINS = {
+     MACHINE_PPC32: ("DEVKITPPC", r"C:\devkitPro\devkitPPC",
+                     "/opt/devkitpro/devkitPPC", "powerpc-eabi-"),
+@@ -389,9 +367,7 @@ def read_patch_table(readelf, elf, byte_order=">"):
+     if len(blob) != size:
+         raise SystemExit("[wxlm] short read of .wxlm.patches")
+ 
+-    # Validate what the host will validate, here, where the fix is cheap. A
+-    # module that ships a patch the loader will always refuse is a build bug,
+-    # and finding it at build time costs a script run rather than a boot.
++    # Validate patch declarations at build time.
+     count = size // PATCH_ENTRY_SIZE
+     for i in range(count):
+         rec = blob[i * PATCH_ENTRY_SIZE:(i + 1) * PATCH_ENTRY_SIZE]
+@@ -534,22 +510,7 @@ def build(args):
+ 
+     undefined = ppc_relocs.read_undefined_symbols(readelf, args.elf)
+ 
+-    # EVERY undefined symbol, not just the ones a fixed-up relocation points at.
+-    #
+-    # The check further down catches an undefined symbol reached through a
+-    # relocation this writer RESOLVES - ADDR32 on PowerPC, ABS64 on AArch64.
+-    # A CALL is neither: a branch relocation is PC-relative, needs no runtime
+-    # fixup, and is therefore never looked at. So a module could call a function
+-    # that does not exist and be packed without complaint, and the call would
+-    # go wherever --unresolved-symbols=ignore-all left it. Which is address 0.
+-    #
+-    # Measured: AIPuppet was packed with an undefined AIPuppet::Init(), 16
+-    # imports, and a cheerful summary - because its second translation unit had
+-    # never been compiled and nothing here was looking.
+-    #
+-    # The link is -nostdlib with libgcc, and imports are the only thing allowed
+-    # to stay undefined, so the rule is simply: anything undefined that is not
+-    # an import is a bug.
++    # All undefined symbols must be wiixl_import__ prefixed imports.
+     stray = sorted(n for n in undefined if not n.startswith("wiixl_import__"))
+     if stray:
+         raise SystemExit(
+@@ -563,7 +524,8 @@ def build(args):
+             "mod.json - or that\n"
+             "  the mod is calling something it expected the host to provide.\n"
+             % (os.path.basename(args.elf), len(stray),
+-               "".join("    %s\n" % n for n in stray)))
++               "".join("    %s\n" % s for s in stray[:20]) +
++               ("    ... and %d more\n" % (len(stray) - 20) if len(stray) > 20 else "")))
+ 
+     if machine == MACHINE_AARCH64:
+         relocs, discovered = read_relocations_aarch64(
+@@ -594,10 +556,7 @@ def build(args):
+         required.append((strings.add(surface), major, minor))
+         required_names.add(surface)
+ 
+-    # Every surface an import names is required, whether or not it was listed.
+-    # Otherwise a module could import from a surface it never declared and get
+-    # an UNRESOLVED-IMPORT at the site instead of a MISSING-SURFACE up front,
+-    # which is a worse diagnostic for the same problem.
++    # Require all surfaces referenced by imports.
+     for surface, _symbol in discovered:
+         if surface not in required_names:
+             required.append((strings.add(surface), 1, 0))
+diff --git i/src/main.cpp w/src/main.cpp
+index 1b80422..f08910c 100644
+--- i/src/main.cpp
++++ w/src/main.cpp
+@@ -5,6 +5,10 @@
+ #include <wiixlaunch/loader/net_surface.hpp>
+ #include <wiixlaunch/loader/base_surfaces.hpp>
+ 
++// The logo demo draws over BotW's heart meter. Off for this setup; mods draw
++// their own UI through botw.gui instead (see mods/hud).
++#define WIIXL_NO_DEMO 1
++
+ // Game module registration, if present in the tree.
+ #if __has_include(<wiixlaunch/module.hpp>)
+ #include <wiixlaunch/module.hpp>
+@@ -122,6 +126,16 @@ extern "C" void WiiXLaunch_Init() {
+     NVN::Init();
+ #elif WIIXL_CEMU
+     GX2::Init();
++    // The code cave holds ~3 MB, not enough for the GUI's fonts. Once the game
++    // is up, move host allocations onto coreinit's MEM2 base heap (see
++    // vendor/wiixlaunch-botw/docs/gui.md, "Loading and memory"). Registered
++    // before any mod's GUI::Init, so it runs before the fonts are loaded.
++    GX2::OnInitialized([]() {
++        if (WiiXLaunch::Mem::UseCoreinitHeap(8u << 20))
++            WIIXL_LOG("WiiXLaunch: host allocations moved to the coreinit MEM2 heap");
++        else
++            WIIXL_LOG("WiiXLaunch: no coreinit heap with 8 MB free - staying in the code cave");
++    });
+ #endif
+ #endif // WIIXL_BOTW_GRAPHICS
+ 

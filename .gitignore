@@ -1,0 +1,19 @@
+# Never share game files or saves - each person dumps their own copy of BotW.
+/cemu/
+/gameFiles/
+/extracted/
+/backups/
+/graphicPacks/
+*.zip
+*.7z
+
+# Fetched/built by `wxl setup` / `wxl build`
+/WiiXLaunch/
+/mods/*/build/
+/mods/*/compile_commands.json
+/mods/*/.cache/
+/mods/*/.vscode/
+
+/.vscode/
+.DS_Store
+__pycache__/

@@ -1,0 +1,9 @@
+{
+  "id": "loadout",
+  "heapRequest": 8192,
+  "require": [
+    "botw.input@1.0",
+    "botw.player@1.1",
+    "botw.pouch@1.1"
+  ]
+}

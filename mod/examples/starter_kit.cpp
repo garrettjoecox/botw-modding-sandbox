@@ -12,8 +12,9 @@
 //   * Items are named the way the game names them, as text in double quotes.
 //   * give_and_equip() is a function with parameters: it bundles two steps,
 //     so starter_kit() reads like a shopping list.
-//   * Weapons always arrive brand new, so their amount is just 1. The amount
-//     matters for things that stack, like arrows.
+//   * For a weapon, the amount is how much durability it has, in the game's
+//     own units: a new Traveler's Sword has 2000. Give it 1 and it breaks on
+//     the first hit. For things that stack, like arrows, it's how many.
 //   * The game equips things a frame or two after it's asked to.
 //
 // Some item names (wxl actors finds the rest, e.g.  wxl actors shroom):
@@ -25,6 +26,8 @@
 //
 // Ideas to try:
 //   * Change what's in the kit. Add 10 apples.
+//   * Find another weapon's full durability: equip a new one and print
+//     durability(SWORD) - or paste in unbreakable_weapons.cpp, which prints it.
 //   * Make the kit cost 50 rupees, and refuse if Link can't pay.
 //   * Give a random weapon: random_number(1, 3) gives back 1, 2 or 3.
 
@@ -39,10 +42,10 @@ void give_and_equip(const char* item, int amount) {
 
 void starter_kit() {
     if (held(ZL) && pressed(R)) {
-        give_and_equip("Weapon_Sword_001", 1);    // Traveler's Sword
-        give_and_equip("Weapon_Bow_001", 1);      // Traveler's Bow
-        give_and_equip("Weapon_Shield_001", 1);   // Wooden Shield
-        give_and_equip("NormalArrow", 20);        // 20 arrows
+        give_and_equip("Weapon_Sword_001", 2000);   // Traveler's Sword, new
+        give_and_equip("Weapon_Bow_001", 2200);     // Traveler's Bow, new
+        give_and_equip("Weapon_Shield_001", 1200);  // Wooden Shield, new
+        give_and_equip("NormalArrow", 20);          // 20 arrows
         print("Here's your starter kit!");
     }
 }

@@ -111,7 +111,10 @@ bool        weapon_changed(Weapon weapon);   // true on the frame Link equips a 
 // Traveler's Sword. examples/starter_kit.cpp lists a few, and  wxl actors
 // looks up the rest (e.g.  wxl actors apple).
 
-bool give_item(const char* name, int amount);  // amount = how many. Use 1 for weapons: they always come brand new
+// amount = how many. For a weapon it's the durability instead, in the game's
+// units: a new Traveler's Sword has 2000. (Give a weapon 1 and it breaks on the
+// first hit.)
+bool give_item(const char* name, int amount);
 bool equip(const char* name);                  // equips an item Link already has
 
 int  rupees();

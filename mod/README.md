@@ -166,10 +166,14 @@ Each of these really happened while making the examples. Most make a good
    works out fall damage from how far Link fell, not from how fast he landed.
    That's why the jetpack has a height limit (falls of about 17 m did no
    damage).
-3. **The starter kit's durability numbers did nothing.** Weapons were given with
-   amounts like 2200, but every weapon arrived with the game's own durability
-   (a Traveler's Sword reads 2000 whatever you pass). Amounts only matter for
-   things that stack, such as arrows.
+3. **Starter-kit weapons broke on the first hit.** The first test gave weapons
+   with amounts like 2200 and read their durability straight back: always the
+   game's own full value (a Traveler's Sword read 2000), whatever was passed. So
+   the kit was changed to pass 1. Wrong: the amount IS the durability, stored on
+   the weapon in the inventory. The test only ever looked at the weapon in
+   Link's hand, which the game had just created at full strength. Spare copies
+   came out with 1 durability, which a student found by playing. Check the
+   thing the player will actually see.
 4. **The clock stuck at 11:00** (`time_warp.cpp`). That wasn't the mod. On the
    Great Plateau, BotW pins its own clock at 11:00; "skip 3 hours" briefly
    reads 14:00, and then the game puts it back. Always check the game without

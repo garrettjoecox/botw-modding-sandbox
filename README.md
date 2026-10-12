@@ -7,21 +7,25 @@
 > with or endorsed by Nintendo.
 
 Write C++ mods for *The Legend of Zelda: Breath of the Wild* (Wii U v208) and run
-them in Cemu. The lessons are in [`mods/README.md`](mods/README.md).
+them in Cemu. Your code goes in one file, [`mod/my_mod.cpp`](mod/my_mod.cpp), and
+[`mod/examples/`](mod/examples/) has ready-made pieces to copy into it. It's set up
+for someone new to coding, with the framework setup kept out of the way. Start
+with [`mod/README.md`](mod/README.md).
 
 Everything goes through one script: `./wxl` on macOS, `wxl` (i.e. `wxl.cmd`) on
 Windows.
 
 ```text
 wxl setup [--base DIR] [--update DIR] [--dlc DIR]   first-time install
-wxl build [MOD ...]                                  compile mods (default: all)
+wxl build                                            compile the mod in mod/ and install it
 wxl play                                             launch the game
-wxl log [TEXT]                                       mod output from the last run
+wxl log [TEXT]                                       what the mod print()ed in the last run
+wxl actors [TEXT]                                    the game's names for things, for spawn()
 wxl doctor                                           what's installed / missing
 wxl host                                             rebuild the framework core (rarely)
 ```
 
-Mods load at boot, so restart the game after `wxl build`.
+The game loads mods at boot, so restart it after `wxl build`.
 
 ## What you need
 
@@ -63,7 +67,7 @@ any folder that contains the `code/content/meta` folders somewhere inside it.
 
 | Path | What | Shared? |
 |---|---|---|
-| `mods/<name>/` | The lessons: `mod.cpp` + `mod.json` | yes |
+| `mod/` | The mod: `my_mod.cpp`, examples to copy from, and the engine underneath | yes |
 | `pack/WiiXLaunch_BotW/` | Prebuilt host graphic pack (same file on every OS) | yes |
 | `tools/wxl.py` | The workspace script | yes |
 | `tools/profiles/` | Keyboard profiles; Cemu stores OS-specific key codes | yes |
@@ -112,10 +116,12 @@ Avoid binding Tab: Cemu shows the GamePad screen while it's held.
 
 ## What has been tested where
 
-- **macOS, Cemu nightly + Metal:** everything, in game (see `mods/README.md`).
-- **The Windows configuration** (Cemu 2.6, Vulkan, generated config, all nine mods)
-  was run on a Mac using Cemu 2.6's Mac build. The pack applied, 9/9 mods loaded,
-  and the HUD drew.
+- **macOS, Cemu nightly + Metal:** the mod with every example pasted in, in game
+  (see `mod/README.md` for which examples).
+- **The Windows configuration** (Cemu 2.6, Vulkan, generated config) was run on a
+  Mac using Cemu 2.6's Mac build, with an earlier version of the examples (nine
+  separate mods using the same game functions). The pack applied, all of them
+  loaded, and the HUD drew. The current mod hasn't been run on Cemu 2.6.
 - **The Windows-only code in `wxl.py`** (Cemu zip install, Windows paths in
   `settings.xml`, Docker builds through a `/work` mount) was exercised on the Mac.
 - **Not yet run on a real Windows machine:** `wxl.cmd`, the Windows keyboard
@@ -124,5 +130,5 @@ Avoid binding Tab: Cemu shows the GamePad screen while it's held.
 ## License
 
 GPL-3.0 (see `LICENSE`), matching [WiiXLaunch](https://github.com/BladesawStudios/WiiXLaunch):
-the prebuilt `pack/` contains compiled WiiXLaunch code, and the mods build
+the prebuilt `pack/` contains compiled WiiXLaunch code, and the mod builds
 against its SDK. No game files or Nintendo assets are included.

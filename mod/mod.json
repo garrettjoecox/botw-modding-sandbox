@@ -1,0 +1,23 @@
+{
+  "id": "my_mod",
+  "entry": "engine/main.cpp",
+  "sources": [
+    "engine/game.cpp",
+    "engine/screen.cpp",
+    "my_mod.cpp"
+  ],
+  "include": [
+    "."
+  ],
+  "heapRequest": 8192,
+  "require": [
+    "botw.actor@1.0",
+    "botw.events@1.0",
+    "botw.gamedata@1.3",
+    "botw.gui@1.1",
+    "botw.input@1.0",
+    "botw.player@1.1",
+    "botw.pouch@1.1",
+    "botw.world@1.0"
+  ]
+}

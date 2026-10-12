@@ -4,9 +4,10 @@
     wxl setup [--base DIR] [--update DIR] [--dlc DIR]
                        download Cemu, write its config, install the WiiXLaunch
                        pack, fetch the framework, and (optionally) copy in game files
-    wxl build [MOD ...]  compile mods (default: all of mods/) and install them
+    wxl build            compile the mod in mod/ and install it
     wxl play             launch BotW in Cemu
-    wxl log [TEXT]       show mod/host log lines from the last run (optionally filtered)
+    wxl log [TEXT]       show the mod's messages from the last run (optionally filtered)
+    wxl actors [TEXT]    list actor names (for spawn) with their English names
     wxl host             rebuild the WiiXLaunch host and refresh pack/ (rarely needed)
     wxl doctor           check what is installed and what is missing
 
@@ -31,7 +32,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 TOOLS = ROOT / "tools"
-MODS = ROOT / "mods"
+MOD = ROOT / "mod"                    # the one mod: my_mod.cpp, engine, mod.json
+EXAMPLES = MOD / "examples"           # reference code to copy from; not built
 PACK_SRC = ROOT / "pack" / "WiiXLaunch_BotW"
 WXL = ROOT / "WiiXLaunch"
 
@@ -51,6 +53,12 @@ WXL_COMMIT = "30e0502ff2abb76b1816e8271d4126e0a95ac9fc"
 WXL_PATCH = TOOLS / "wiixlaunch-local.patch"
 
 DOCKER_IMAGE = "wiixl-dkp"
+
+# Earlier layouts of this workspace installed these: nine separate lesson mods,
+# then one combined "lessons" mod. `wxl build` removes them so they don't run
+# alongside my_mod.
+OLD_MODS = ("hello", "stamina", "hud", "time_warp", "loadout", "unbreakable",
+            "bounty", "jetpack", "rupee_hook", "lessons")
 
 IS_WINDOWS = sys.platform == "win32"
 IS_MAC = sys.platform == "darwin"
@@ -316,39 +324,76 @@ def cmd_doctor(args):
     print(f"  installed mods: {', '.join(m[:-5] for m in mods) or 'none'}")
 
 
-def all_mods():
-    return sorted(p.parent.name for p in MODS.glob("*/mod.json"))
+def read_manifest():
+    path = MOD / "mod.json"
+    if not path.exists():
+        die("no mod/mod.json")
+    return path, json.loads(path.read_text())
+
+
+def sync_sources():
+    """List every .cpp in mod/ in mod.json, so a new file builds without editing it.
+
+    examples/ is left out: those files are there to copy from, and building them
+    all would define every example function a second time."""
+    path, manifest = read_manifest()
+    entry = manifest.get("entry", "mod.cpp")
+    found = []
+    for p in sorted(MOD.rglob("*.cpp")):
+        rel = p.relative_to(MOD)
+        if rel.parts[0] in ("build", "examples") or any(part.startswith(".") for part in rel.parts):
+            continue
+        if rel.as_posix() != entry:
+            found.append(rel.as_posix())
+    if manifest.get("sources") != found:
+        manifest["sources"] = found
+        path.write_text(json.dumps(manifest, indent=2) + "\n")
+        say("mod.json: updated the list of source files")
+    return manifest
+
+
+def write_compile_commands(manifest):
+    """One entry per source file, for the editor (build_mod.py writes just the entry)."""
+    path = MOD / "compile_commands.json"
+    try:
+        db = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return
+    if not db:
+        return
+    flags = [a for a in db[0]["arguments"] if not a.endswith(".cpp")]
+    files = [manifest.get("entry", "mod.cpp")] + manifest.get("sources", [])
+    entries = []
+    for rel in files:
+        f = (MOD / rel).as_posix()
+        entries.append({"directory": MOD.as_posix(), "file": f, "arguments": flags + ["-c", f]})
+    path.write_text(json.dumps(entries, indent=2) + "\n")
 
 
 def cmd_build(args):
     ensure_wiixlaunch()
-    names = args.mods or all_mods()
+    manifest = sync_sources()
+    mod_id = manifest.get("id", "my_mod")
     toolchain = pick_toolchain(args)
-    say(f"toolchain: {toolchain}")
+    say(f"building mod/ with {toolchain} devkitPPC")
+    if toolchain == "native":
+        rc = run([sys.executable, str(WXL / "sdk" / "scripts" / "build_mod.py"), "--source", "mod"],
+                 cwd=ROOT, check=False)
+    else:
+        rc = in_docker("python3 WiiXLaunch/sdk/scripts/build_mod.py --source mod", cwd=ROOT)
+        fix_container_paths(MOD)
+    write_compile_commands(manifest)
+    out = MOD / "build" / f"{mod_id}.wxlm"
+    if rc != 0 or not out.exists():
+        die("the build failed - the first error above says what went wrong")
     PACK_MODS.mkdir(parents=True, exist_ok=True)
-    failed = []
-    for name in names:
-        mod_dir = MODS / name
-        if not (mod_dir / "mod.cpp").exists():
-            die(f"no mods/{name}/mod.cpp")
-        mod_id = json.loads((mod_dir / "mod.json").read_text()).get("id", name) \
-            if (mod_dir / "mod.json").exists() else name
-        say(f"building {name}")
-        if toolchain == "native":
-            rc = run([sys.executable, str(WXL / "sdk" / "scripts" / "build_mod.py"), "--source", name],
-                     cwd=MODS, check=False)
-        else:
-            rc = in_docker(f"python3 ../WiiXLaunch/sdk/scripts/build_mod.py --source {name}", cwd=MODS)
-            fix_container_paths(mod_dir)
-        out = mod_dir / "build" / f"{mod_id}.wxlm"
-        if rc != 0 or not out.exists():
-            failed.append(name)
-            continue
-        shutil.copyfile(out, PACK_MODS / out.name)
-        say(f"installed {out.name}")
-    if failed:
-        die(f"failed: {', '.join(failed)}")
-    say("done - restart the game to load the new build")
+    shutil.copyfile(out, PACK_MODS / out.name)
+    for name in OLD_MODS:
+        old = PACK_MODS / f"{name}.wxlm"
+        if old.exists() and old.name != out.name:
+            old.unlink()
+            say(f"removed {old.name} from an earlier layout of this workspace")
+    say(f"installed {out.name} - restart the game to load it")
 
 
 def cmd_play(args):
@@ -367,12 +412,48 @@ def cmd_play(args):
 def cmd_log(args):
     if not LOG.exists():
         die("no log yet - run the game first")
+    _, manifest = read_manifest()
+    prefix = manifest.get("id", "my_mod") + ": "
+    problems = ("refused", "fail", "error", "missing", "conflict")
     for line in LOG.read_text(errors="ignore").splitlines():
-        if not args.all and ("[OSConsole]" not in line or " Tick: " in line):
+        if args.all:
+            shown = line
+        elif "[OSConsole]" in line:
+            # "[12:00:00.000] [OSConsole] my_mod: Hello" -> "Hello"
+            text = line.split("[OSConsole]", 1)[1].strip()
+            if text.startswith(prefix):
+                shown = text[len(prefix):]
+            elif prefix[:-2] in text and any(p in text.lower() for p in problems):
+                shown = "(loader) " + text   # e.g. the mod was refused at load
+            else:
+                continue
+        else:
             continue
-        if args.text and args.text.lower() not in line.lower():
+        if args.text and args.text.lower() not in shown.lower():
             continue
-        print(line)
+        print(shown)
+
+
+def cmd_actors(args):
+    """Actor names from the user's own dump, with the game's English names."""
+    import botw_files   # tools/botw_files.py, next to this script
+    content = [d / "content" for d in (UPDATE_DIR, GAME) if (d / "content").is_dir()]
+    if not content:
+        die("no game files yet - run: wxl setup --base <dump> --update <dump>")
+    names = botw_files.actor_names(content)
+    english = botw_files.english_names(content)
+    # "_Far" actors are the low-detail stand-ins the game draws in the distance.
+    names = sorted(n for n in names if not n.endswith("_Far"))
+    text = (args.text or "").lower()
+    shown = [n for n in names if text in n.lower() or text in english.get(n, "").lower()]
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="replace")   # a Windows console may not have every character
+    for name in shown:
+        print(f"{name:<44} {english.get(name, '')}".rstrip())
+    if text:
+        print(f"[{len(shown)} of {len(names)} actors match \"{args.text}\"]")
+    else:
+        print(f"[{len(names)} actors. Narrow it down: wxl actors bokoblin]")
 
 
 def cmd_host(args):
@@ -409,17 +490,20 @@ def main():
     p.add_argument("--dlc", help="dumped DLC folder")
     p.set_defaults(func=cmd_setup)
 
-    p = sub.add_parser("build", help="compile and install mods")
-    p.add_argument("mods", nargs="*", help="mod folder names (default: all)")
+    p = sub.add_parser("build", help="compile the mod and install it")
     toolchain_flags(p)
     p.set_defaults(func=cmd_build)
 
     sub.add_parser("play", help="launch the game").set_defaults(func=cmd_play)
 
-    p = sub.add_parser("log", help="show mod log lines from the last run")
+    p = sub.add_parser("log", help="show the mod's messages from the last run")
     p.add_argument("text", nargs="?", help="only lines containing this")
-    p.add_argument("--all", action="store_true", help="every log line, not just [OSConsole]")
+    p.add_argument("--all", action="store_true", help="the whole Cemu log")
     p.set_defaults(func=cmd_log)
+
+    p = sub.add_parser("actors", help="list actor names for spawn(), with English names")
+    p.add_argument("text", nargs="?", help="only names containing this (either name)")
+    p.set_defaults(func=cmd_actors)
 
     p = sub.add_parser("host", help="rebuild the WiiXLaunch host")
     toolchain_flags(p)

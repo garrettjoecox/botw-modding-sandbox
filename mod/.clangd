@@ -1,6 +1,6 @@
-# Editor-only settings for every mod in this folder.
+# Editor-only settings for the mod in this folder.
 #
-# Builds run devkitPPC's powerpc-eabi-g++ inside Docker (tools/dkp), and each
+# Builds run devkitPPC's powerpc-eabi-g++ (often inside Docker), and each
 # build writes compile_commands.json with that compiler's flags. clangd on the
 # Mac can't run that compiler and rejects some GCC/PowerPC-only flags, so swap
 # in the host clang and drop those flags. This only affects squiggles and

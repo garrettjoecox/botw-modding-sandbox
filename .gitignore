@@ -9,10 +9,10 @@
 
 # Fetched/built by `wxl setup` / `wxl build`
 /WiiXLaunch/
-/mods/*/build/
-/mods/*/compile_commands.json
-/mods/*/.cache/
-/mods/*/.vscode/
+/mod/build/
+/mod/compile_commands.json
+/mod/.cache/
+/mod/.vscode/
 
 /.vscode/
 .DS_Store

@@ -461,6 +461,15 @@ bool set_flag(const char* name, bool on) {
     return GameData::SetFlagBool(name, on ? 1 : 0) != 0;
 }
 
+// --- sounds ------------------------------------------------------------------
+
+bool play_sound(const char* name) {
+    // botw.sound looks the name up in the game's own list of sound events and
+    // plays it. It only reaches one small set (about 51 sounds), and returns
+    // false for a name that isn't in it.
+    return Sound::Play(name) != 0;
+}
+
 // --- extras ------------------------------------------------------------------
 
 bool same_text(const char* a, const char* b) {

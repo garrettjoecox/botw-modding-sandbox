@@ -66,6 +66,7 @@ ends its header with **Ideas to try**.
 | Example | What it does | Buttons | Shows you |
 |---|---|---|---|
 | `hello.cpp` | Says hello, then reports every 10 seconds | — | variables, `if`, `print()` |
+| `button_sounds.cpp` | Clicks every time you press A, B, X or Y | A, B, X, Y | sounds, `\|\|` (or) |
 | `infinite_stamina.cpp` | Stamina never runs out | sprint | reading and changing game values |
 | `hud.cpp` | A panel with the time, weather, hearts and rupees | — | drawing, screen positions, `%d` and `%.1f` |
 | `giant_horse.cpp` | Brings the Giant Horse | ZL + B | spawning, actor names |

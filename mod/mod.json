@@ -18,6 +18,7 @@
     "botw.input@1.0",
     "botw.player@1.1",
     "botw.pouch@1.1",
+    "botw.sound@1.0",
     "botw.world@1.0"
   ]
 }

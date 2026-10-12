@@ -190,6 +190,16 @@ void draw_colored_text(float x, float y, Color color, const char* format, ...) B
 void draw_box(float x, float y, float width, float height, Color color);
 
 // =============================================================================
+// Sounds
+// =============================================================================
+//
+// Plays one of the game's own sound effects by name, e.g. "mc_Key_Decide".
+// Only a small set of about 51 sounds can be reached this way (menus, the
+// keyboard, the title screen, upgrades); examples/button_sounds.cpp lists them.
+
+bool play_sound(const char* name);   // false if the game has no sound by that name
+
+// =============================================================================
 // Handy extras
 // =============================================================================
 

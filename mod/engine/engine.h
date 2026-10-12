@@ -18,6 +18,7 @@
 #include <wiixlaunch/imports/botw_input.h>
 #include <wiixlaunch/imports/botw_player.h>
 #include <wiixlaunch/imports/botw_pouch.h>
+#include <wiixlaunch/imports/botw_sound.h>
 #include <wiixlaunch/imports/botw_world.h>
 #include <wiixlaunch/imports/wiixl_core.h>
 #include <wiixlaunch/mod_log.h>
@@ -78,6 +79,10 @@ namespace Pouch {
 WXL_USE_botw_pouch(AddItem);
 WXL_USE_botw_pouch(EquipItem);
 WXL_USE_botw_pouch(TickEquipRefresh);
+}
+
+namespace Sound {
+WXL_USE_botw_sound(Play);
 }
 
 namespace World {

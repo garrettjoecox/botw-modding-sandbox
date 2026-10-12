@@ -170,6 +170,20 @@ bool flag(const char* name);                 // is it on?
 bool set_flag(const char* name, bool on);    // false if the game refused
 
 // =============================================================================
+// Link's settings
+// =============================================================================
+//
+// Many of Link's numbers come from a settings file in the game's data
+// (Player_Link.bgparamlist): how long Stasis lasts, and much more. These read
+// and change the decimal-number ones by name while the game runs. Changes last
+// until the game restarts. See examples/longer_stasis.cpp. Every name is listed
+// in the zeldaret/botw decompilation, in
+// src/KingSystem/Resource/GeneralParamList/resGParamListObjectPlayer.h.
+
+float link_setting(const char* name);                // 0 if there's no such setting
+bool  set_link_setting(const char* name, float value);  // false if there's no such setting
+
+// =============================================================================
 // Drawing on the screen
 // =============================================================================
 //

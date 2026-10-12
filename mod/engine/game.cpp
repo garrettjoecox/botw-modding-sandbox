@@ -488,6 +488,77 @@ bool play_sound(const char* name) {
     return Sound::Play(name) != 0;
 }
 
+// --- Link's settings ---------------------------------------------------------
+//
+// Numbers like how long Stasis lasts are "parameters" the game loads from its
+// data (Actor/GeneralParamList/Player_Link.bgparamlist) into memory, where each
+// one sits in a 16-byte record: CRC32 of its name, next record, type, value.
+//
+// The path to them (Wii U v208), from wiixlaunch-botw's armour code: actor
+// +0x39c -> parameter resource, +0x78 -> GParamList, +0x244 -> one object per
+// kind, by number. Kind 0x15 is "Player" (GParamListObjType in the zeldaret/botw
+// decompilation). Measured: StopTimerLongTime sits at Player+0xb0 with 300.0
+// at +0xc, exactly as in the file.
+
+namespace {
+
+constexpr int kPlayerParams = 0x15;
+constexpr uint32_t kFloatParamType = 0x1030ef08;   // the type word of every f32 parameter seen
+
+uint32_t Crc32(const char* text) {
+    uint32_t crc = 0xFFFFFFFFu;
+    for (; *text; ++text) {
+        crc ^= static_cast<uint8_t>(*text);
+        for (int i = 0; i < 8; ++i) crc = (crc >> 1) ^ (0xEDB88320u & (0u - (crc & 1u)));
+    }
+    return ~crc;
+}
+
+bool PlausibleAddress(uintptr_t p) {
+    return p >= 0x10000000u && p < 0xA0000000u && (p & 3u) == 0;
+}
+
+uint32_t Read32(uintptr_t address) {
+    return *reinterpret_cast<const uint32_t*>(address);
+}
+
+// The value of one of Link's decimal-number settings, or null.
+float* LinkSetting(const char* name) {
+    const uint32_t link = Link();
+    const uintptr_t actor = link ? Player::ActorUnsafeRawPointer(link) : 0;
+    if (!name || !PlausibleAddress(actor)) return nullptr;
+    const uintptr_t params = Read32(actor + 0x39c);
+    if (!PlausibleAddress(params)) return nullptr;
+    const uintptr_t list = Read32(params + 0x78);
+    if (!PlausibleAddress(list) || Read32(list + 0x240) <= kPlayerParams) return nullptr;
+    const uintptr_t array = Read32(list + 0x244);
+    if (!PlausibleAddress(array)) return nullptr;
+    const uintptr_t object = Read32(array + 4 * kPlayerParams);
+    if (!PlausibleAddress(object)) return nullptr;
+
+    const uint32_t hash = Crc32(name);
+    for (uintptr_t at = object; at < object + 0x1000; at += 4) {
+        if (Read32(at) != hash) continue;
+        if (Read32(at + 8) != kFloatParamType) return nullptr;   // not a decimal number
+        return reinterpret_cast<float*>(at + 0xc);
+    }
+    return nullptr;
+}
+
+} // namespace
+
+float link_setting(const char* name) {
+    const float* value = LinkSetting(name);
+    return value ? *value : 0.0f;
+}
+
+bool set_link_setting(const char* name, float value) {
+    float* setting = LinkSetting(name);
+    if (!setting) return false;
+    *setting = value;
+    return true;
+}
+
 // --- extras ------------------------------------------------------------------
 
 bool same_text(const char* a, const char* b) {

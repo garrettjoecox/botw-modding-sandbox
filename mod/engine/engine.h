@@ -38,6 +38,7 @@ WXL_USE_botw_player(GetPosition);
 WXL_USE_botw_player(GetEquippedSword);
 WXL_USE_botw_player(GetEquippedShield);
 WXL_USE_botw_player(GetEquippedBow);
+WXL_USE_botw_player(ActorUnsafeRawPointer);
 }
 
 namespace Actor {

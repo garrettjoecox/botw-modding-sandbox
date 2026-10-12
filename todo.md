@@ -1,0 +1,5 @@
+- Button to reverse controls
+- Give you stasis plus right away, and stasis has infinite timer
+- button to activate bullet time
+- Can we make bows multishot
+- Spawning wand with UI to select what to spawn

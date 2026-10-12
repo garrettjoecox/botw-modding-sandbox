@@ -77,6 +77,7 @@ ends its header with **Ideas to try**.
 | `spawn_rocks.cpp` | Drops a row of five boulders | ZL + A | `for` loops |
 | `unbreakable_weapons.cpp` | Weapons never wear out | — | remembering values, arrays |
 | `exploration_rewards.cpp` | Rupees for Korok seeds, shrines and towers | — | reacting to events |
+| `longer_stasis.cpp` | Stasis freezes things three times as long (untested on the rune itself; see the file) | — | Link's settings |
 | `slate_abilities.cpp` | Unlocks the runes, Camera and Sheikah Sensor (only partly works yet; see the file) | ZL + L | game flags |
 | `jetpack.cpp` | Fly up to 15 m, then float down on a parachute | hold ZL + X | physics, game rules |
 | `double_rupees.cpp` | Every rupee you pick up counts twice | ZL + Minus tests it | hooks: the game calls your code |

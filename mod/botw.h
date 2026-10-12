@@ -151,6 +151,18 @@ bool activated_tower();   // Link just activated a Sheikah tower
 int  korok_seeds();       // how many Korok seeds Link has found so far
 
 // =============================================================================
+// Game flags
+// =============================================================================
+//
+// The game remembers thousands of yes/no facts by name: which runes Link has
+// ("IsGet_Obj_Magnetglove"), which shrines are done, what people have told him.
+// Changing the wrong one can confuse a quest, so back up your save first.
+// See examples/slate_abilities.cpp.
+
+bool flag(const char* name);                 // is it on?
+bool set_flag(const char* name, bool on);    // false if the game refused
+
+// =============================================================================
 // Drawing on the screen
 // =============================================================================
 //

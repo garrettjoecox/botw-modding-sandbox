@@ -70,6 +70,8 @@ WXL_USE_botw_gamedata(GetRupees);
 WXL_USE_botw_gamedata(SetRupees);
 WXL_USE_botw_gamedata(AddRupees);
 WXL_USE_botw_gamedata(GetKorokCount);
+WXL_USE_botw_gamedata(GetFlagBool);
+WXL_USE_botw_gamedata(SetFlagBool);
 }
 
 namespace Pouch {

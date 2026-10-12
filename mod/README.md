@@ -69,23 +69,27 @@ ends its header with **Ideas to try**.
 | `infinite_stamina.cpp` | Stamina never runs out | sprint | reading and changing game values |
 | `hud.cpp` | A panel with the time, weather, hearts and rupees | — | drawing, screen positions, `%d` and `%.1f` |
 | `giant_horse.cpp` | Brings the Giant Horse | ZL + B | spawning, actor names |
+| `master_cycle.cpp` | Brings the Master Cycle Zero motorbike | ZL + ZR | spawning |
 | `time_warp.cpp` | Speeds up time, skips hours, makes it rain | ZL + D-pad | `held()` vs `pressed()`, `&&`, `%` |
 | `starter_kit.cpp` | Gives and equips a sword, bow, shield and arrows | ZL + R | item names, a function with parameters |
 | `spawn_enemies.cpp` | Spawns a random enemy in front of Link | ZL + Y | arrays of text, `random_number()` |
 | `spawn_rocks.cpp` | Drops a row of five boulders | ZL + A | `for` loops |
 | `unbreakable_weapons.cpp` | Weapons never wear out | — | remembering values, arrays |
 | `exploration_rewards.cpp` | Rupees for Korok seeds, shrines and towers | — | reacting to events |
+| `slate_abilities.cpp` | Unlocks the runes, Camera and Sheikah Sensor (only partly works yet; see the file) | ZL + L | game flags |
 | `jetpack.cpp` | Fly up to 15 m, then float down on a parachute | hold ZL + X | physics, game rules |
 | `double_rupees.cpp` | Every rupee you pick up counts twice | ZL + Minus tests it | hooks: the game calls your code |
 
 On the keyboard, **ZL is the Z key**. A is E, B is Left Shift, X is Space, Y is
-F, R is R, Minus is M and the D-pad is the arrow keys. The top-level README has
+F, L is Q, R is R, ZR is V, Minus is M and the D-pad is the arrow keys. The top-level README has
 the full layout.
 
-All twelve examples were pasted into one `my_mod.cpp` together, following their
-own instructions, and built with no warnings. Every one except
+All examples were pasted into one `my_mod.cpp` together, following their own
+instructions, and built with no warnings. Every one except
 `exploration_rewards.cpp` was tried in the game; that one builds and loads, but
-no Korok, shrine or tower was reached in testing. `double_rupees.cpp` was tried
+no Korok, shrine or tower was reached in testing. `slate_abilities.cpp` only
+partly works so far: the Sheikah Sensor appears, the runes don't (details in
+the file). `double_rupees.cpp` was tried
 with its ZL + Minus test rather than a real rupee.
 
 ## Finding actor names
@@ -179,30 +183,38 @@ Each of these really happened while making the examples. Most make a good
    `Enemy_Bokoblin_Junior`. The framework's name check also tests that the text
    lives in the game's part of memory, and a mod's own text never does. The
    engine now checks names itself (`LooksLikeActorName` in `engine/game.cpp`).
-8. **The Giant Horse fell off a cliff.** It spawned 8 m ahead of Link, who was
+8. **Runes aren't items.** Giving `Obj_Magnetglove` with `give_item()` did
+   nothing: the game counts it as a "material" and refuses it. The game's own
+   rune cutscene (`Demo003_0` in the game files) just switches on flags like
+   `IsGet_Obj_Magnetglove`. Setting those from the mod works, but a flag change
+   only lands on the next frame (reading it straight back says "off"). On a save
+   from before the Great Plateau tower, the Sheikah Sensor appeared, but the
+   runes still didn't, even after a save and reload, so the game wants
+   something more that early on.
+9. **The Giant Horse fell off a cliff.** It spawned 8 m ahead of Link, who was
    standing on a hilltop, which was past the edge. Spawning is just a position;
    the game's physics decides where things end up.
 
 These are now handled inside the engine, so the examples don't have to:
 
-9. **Only one spawn at a time.** The framework holds a single spawn request and
+10. **Only one spawn at a time.** The framework holds a single spawn request and
    refuses the next until the game has created the first. `spawn()` queues
    requests and hands over one per frame, so five boulders in one frame all
    arrive.
-10. **Items given on the title screen vanished.** A pouch exists there, so adding
+11. **Items given on the title screen vanished.** A pouch exists there, so adding
    items "works", and then loading the save replaces it. The title screen even
    has a Link, but his max life is 0. `Engine::InGame()` checks that before
    running `every_frame()`.
-11. **"New weapon!" printed every frame** (`unbreakable_weapons.cpp`). Each
+12. **"New weapon!" printed every frame** (`unbreakable_weapons.cpp`). Each
    lookup of the equipped sword hands out a new handle, so handles can't be
    compared; the actor's ID can. While an equip settles, the lookup also
    flickers empty every other frame. See `TrackWeapon` in `engine/game.cpp`.
-12. **Equips and forced weather silently never happened**, because something has
+13. **Equips and forced weather silently never happened**, because something has
    to call the game's "keep going" functions every frame (`EndFrame` in
    `engine/game.cpp`).
-13. **Every mod grabbed ~200 KB of memory** and the GUI's fonts no longer fit,
+14. **Every mod grabbed ~200 KB of memory** and the GUI's fonts no longer fit,
     until each mod stated `heapRequest` in `mod.json`.
-14. **ZL was on Tab**, which Cemu uses to show the GamePad screen, so it moved
+15. **ZL was on Tab**, which Cemu uses to show the GamePad screen, so it moved
     to Z.
 
 ## Behind the curtain

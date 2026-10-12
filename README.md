@@ -107,10 +107,11 @@ Avoid binding Tab: Cemu shows the GamePad screen while it's held.
 
 ## Known issues
 
-- **Occasional garbled 3D geometry after loading a save** on macOS/Metal (UI still
-  draws). Seen in 2 of ~12 loads; reloading cleared it. The cause isn't established.
-  The suspects are Metal itself and the GUI's memory coming from the game's MEM2
-  heap.
+- **Occasional garbled 3D geometry** on macOS/Metal (UI still draws). It has
+  shown up while Cemu was compiling new shaders (its "Compiled N new shaders"
+  notice): the first load in a new place, or the first time a spawned model like
+  the Master Cycle is drawn. Running the same thing again once the shaders were
+  cached rendered fine. Reloading clears it.
 - BotW pins the clock at 11:00 at the start of the Great Plateau, so time mods look
   broken there.
 

@@ -448,6 +448,19 @@ int korok_seeds() {
     return count;
 }
 
+// --- game flags ----------------------------------------------------------------
+
+bool flag(const char* name) {
+    uint32_t on = 0;
+    return GameData::GetFlagBool(name, &on) && on != 0;
+}
+
+bool set_flag(const char* name, bool on) {
+    // The game refuses some: flags only its own quest scripts may change, and
+    // flags that can be turned on but never off again.
+    return GameData::SetFlagBool(name, on ? 1 : 0) != 0;
+}
+
 // --- extras ------------------------------------------------------------------
 
 bool same_text(const char* a, const char* b) {

@@ -96,6 +96,7 @@ const WeaponSlot* Slot(Weapon weapon) {
 struct SpawnRequest {
     char name[64];
     float x, y, z;
+    float size;   // 1 = normal
 };
 
 SpawnRequest g_Spawns[16];
@@ -116,7 +117,7 @@ bool LooksLikeActorName(const char* name) {
     return length >= 2;
 }
 
-bool QueueSpawn(const char* name, float x, float y, float z) {
+bool QueueSpawn(const char* name, float x, float y, float z, float size = 1.0f) {
     if (!LooksLikeActorName(name)) {
         print("spawn: \"%s\" isn't an actor name", name ? name : "");
         return false;
@@ -127,6 +128,7 @@ bool QueueSpawn(const char* name, float x, float y, float z) {
     request.x = x;
     request.y = y;
     request.z = z;
+    request.size = size;
     return true;
 }
 
@@ -181,7 +183,14 @@ void EndFrame() {
     if (g_SpawnCount > 0) {
         const uint32_t link = Link();
         const SpawnRequest& next = g_Spawns[0];
-        if (link && Actor::Spawn(next.name, link, next.x, next.y, next.z)) {
+        bool asked = false;
+        if (link && next.size == 1.0f) {
+            asked = Actor::Spawn(next.name, link, next.x, next.y, next.z);
+        } else if (link) {
+            asked = Actor::SpawnScaled(next.name, link, next.x, next.y, next.z,
+                                       next.size, next.size, next.size);
+        }
+        if (asked) {
             for (uint32_t i = 1; i < g_SpawnCount; ++i) g_Spawns[i - 1] = g_Spawns[i];
             --g_SpawnCount;
         }
@@ -316,6 +325,15 @@ bool spawn(const char* name, float distance) {
 
 bool spawn_at(const char* name, float x, float y, float z) {
     return QueueSpawn(name, x, y, z);
+}
+
+bool spawn_scaled(const char* name, float distance, float size) {
+    const uint32_t link = Link();
+    float m[12];
+    if (!link || !Actor::GetMatrix(link, m) || size <= 0.0f) return false;
+    // The game's "@S" creation setting, the same one the map uses to size the
+    // objects it places.
+    return QueueSpawn(name, m[3] + m[2] * distance, m[7] + 2.0f, m[11] + m[10] * distance, size);
 }
 
 // --- weapons -----------------------------------------------------------------

@@ -55,6 +55,7 @@ WXL_USE_botw_actor(SetControllerVelocity);
 WXL_USE_botw_actor(GetHavokVelocity);
 WXL_USE_botw_actor(GetMatrix);
 WXL_USE_botw_actor(Spawn);
+WXL_USE_botw_actor(SpawnScaled);
 }
 
 namespace Input {

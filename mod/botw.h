@@ -90,6 +90,10 @@ float falling_speed();          // how fast Link is dropping, in metres per seco
 
 bool spawn(const char* name, float distance);                // that many metres in front of Link
 bool spawn_at(const char* name, float x, float y, float z);  // at a spot in the world (see link_x())
+// Like spawn(), but bigger or smaller: 2 = twice as big, 0.5 = half. A Bokoblin
+// at 3 and a Chuchu at 5 grew as expected; whether their hit areas and physics
+// grow with them hasn't been checked.
+bool spawn_scaled(const char* name, float distance, float size);
 
 // =============================================================================
 // Weapons Link is holding

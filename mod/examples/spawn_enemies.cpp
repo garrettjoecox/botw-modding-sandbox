@@ -23,6 +23,8 @@
 //   * Add more enemies to the list. (Then change the 5 to match!)
 //   * Spawn a whole gang: three of the same enemy at once.
 //   * Charge 20 rupees per enemy, and refuse if Link can't pay.
+//   * Make them giants: spawn_scaled(enemies[pick], 10, 3) spawns one three
+//     times the normal size.
 
 #include "botw.h"   // my_mod.cpp already has this line
 

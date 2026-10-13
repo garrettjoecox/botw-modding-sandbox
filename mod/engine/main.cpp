@@ -53,6 +53,67 @@ void OnAddCounter(void* manager, int32_t delta, SafeString* name) {
     if (original) original(manager, delta, name);
 }
 
+// --- hiding buttons from the game ---------------------------------------------
+//
+// The game reads the controllers once a frame through two functions (Wii U
+// v208, from wiixlaunch-botw's controller code): 0x030d9f24 for the GamePad
+// (which the keyboard drives in Cemu) and 0x030da168 for Pro Controllers and
+// Wii Remotes. Hooked here BEFORE botw.input installs its own hooks on them:
+// WiiXLaunch calls hooks first-installed-first, so ours wraps everything.
+// botw.input still records the real buttons (for held() and pressed()), and
+// only then do these hooks clear the hidden buttons, before the game sees them.
+
+constexpr uintptr_t kReadGamePad = 0x030d9f24;
+constexpr uintptr_t kReadOtherPads = 0x030da168;
+
+using PadReadFn = void (*)(void* pads);
+PadReadFn volatile g_OriginalReadGamePad;
+PadReadFn volatile g_OriginalReadOtherPads;
+
+// Each botw.h Button (A, B, X, Y, L, R, ZL, ZR, PLUS, MINUS, UP, DOWN, LEFT,
+// RIGHT, L3, R3) as a bit in each controller's own layout - the same values
+// wiixlaunch-botw's controller code translates from. The Wii Remote's D-pad
+// only: its other buttons don't line up with these.
+constexpr uint32_t kGamePadBits[] = {0x8000, 0x4000, 0x2000, 0x1000, 0x0020, 0x0010, 0x0080, 0x0040,
+                                     0x0008, 0x0004, 0x0200, 0x0100, 0x0800, 0x0400, 0x40000, 0x20000};
+constexpr uint32_t kProBits[] = {0x0010, 0x0040, 0x0008, 0x0020, 0x2000, 0x0200, 0x0080, 0x0004,
+                                 0x0400, 0x1000, 0x0001, 0x4000, 0x0002, 0x8000, 0x20000, 0x10000};
+constexpr uint32_t kRemoteBits[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x0008, 0x0004, 0x0001, 0x0002, 0, 0};
+
+uint32_t ControllerBits(uint32_t buttons, const uint32_t* table) {
+    uint32_t bits = 0;
+    for (uint32_t i = 0; i < 16; ++i) {
+        if (buttons & (1u << i)) bits |= table[i];
+    }
+    return bits;
+}
+
+// Clears bits in a controller's hold / trigger / release words.
+void ClearButtons(uint8_t* status, uint32_t bits) {
+    for (int i = 0; i < 3; ++i) *reinterpret_cast<uint32_t*>(status + 4 * i) &= ~bits;
+}
+
+void OnReadGamePad(void* pads) {
+    PadReadFn original = g_OriginalReadGamePad;
+    if (original) original(pads);
+    const uint32_t hidden = Engine::HiddenButtons();
+    if (!hidden) return;
+    ClearButtons(static_cast<uint8_t*>(pads) + 0x14, ControllerBits(hidden, kGamePadBits));   // VPADStatus
+    Engine::HiddenReadDone();
+}
+
+void OnReadOtherPads(void* pads) {
+    PadReadFn original = g_OriginalReadOtherPads;
+    if (original) original(pads);
+    const uint32_t hidden = Engine::HiddenButtons();
+    if (!hidden) return;
+    for (int channel = 0; channel < 4; ++channel) {
+        uint8_t* kpad = static_cast<uint8_t*>(pads) + 0x1118 + channel * 0xF08;
+        ClearButtons(kpad, ControllerBits(hidden, kRemoteBits));                  // Wii Remote
+        if (kpad[0x5C] == 0x1f) ClearButtons(kpad + 0x60, ControllerBits(hidden, kProBits));   // Pro Controller
+    }
+}
+
 } // namespace
 
 void game_add_to_counter(const char* counter, int amount) {
@@ -70,6 +131,13 @@ void game_add_to_counter(const char* counter, int amount) {
 // extern "C" keeps the name exactly "WiiXLaunch_ModEntry" so the loader finds
 // it; "used" stops the compiler deleting it, since nothing in the mod calls it.
 extern "C" __attribute__((used)) void WiiXLaunch_ModEntry() {
+    // First, so they wrap botw.input's hooks on the same functions (see above).
+    g_OriginalReadGamePad = reinterpret_cast<PadReadFn>(
+        Core::InstallHook(kReadGamePad, reinterpret_cast<uintptr_t>(&OnReadGamePad)));
+    g_OriginalReadOtherPads = reinterpret_cast<PadReadFn>(
+        Core::InstallHook(kReadOtherPads, reinterpret_cast<uintptr_t>(&OnReadOtherPads)));
+    if (!g_OriginalReadGamePad || !g_OriginalReadOtherPads) WIIXL_LOG("my_mod: controller hooks refused");
+
     // Each surface installs the game hooks it needs. They're safe to call more
     // than once, so it doesn't matter if another mod already did.
     Input::Init();

@@ -81,6 +81,9 @@ namespace Pouch {
 WXL_USE_botw_pouch(AddItem);
 WXL_USE_botw_pouch(EquipItem);
 WXL_USE_botw_pouch(TickEquipRefresh);
+WXL_USE_botw_pouch(RemoveItem);
+WXL_USE_botw_pouch(GetTypeForName);
+WXL_USE_botw_pouch(FindItemIndex);
 }
 
 namespace Sound {
@@ -121,6 +124,7 @@ WXL_USE_botw_gui(StyleCreate);
 WXL_USE_botw_gui(StyleScale);
 WXL_USE_botw_gui(StyleColor);
 WXL_USE_botw_gui(StyleShadow);
+WXL_USE_botw_gui(StyleAlign);
 WXL_USE_botw_gui(MeasureText);
 WXL_USE_botw_gui(RoundedBox);
 WXL_USE_botw_gui(Text);
@@ -132,6 +136,11 @@ namespace Engine {
 void BeginFrame();   // read buttons, events and weapons for this frame
 void EndFrame();     // keep the game's queued requests moving
 bool InGame();       // a save is loaded and Link is on the field
+
+// Buttons kept from the game (game.cpp collects them, main.cpp's controller
+// hooks clear them). A mask with one bit per botw.h Button: 1 << A, 1 << B...
+uint32_t HiddenButtons();   // 0 when nothing is hidden right now
+void HiddenReadDone();      // a controller read has used the mask
 
 // screen.cpp
 void Draw();         // botw.gui's frame callback

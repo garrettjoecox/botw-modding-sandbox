@@ -29,6 +29,8 @@ constexpr int32_t kButtonIds[] = {
     15,  // DOWN
     12,  // LEFT
     14,  // RIGHT
+    4,   // L3 (left stick click)
+    5,   // R3 (right stick click)
 };
 
 uint32_t MaskFor(Button button) {
@@ -132,6 +134,14 @@ bool QueueSpawn(const char* name, float x, float y, float z, float size = 1.0f) 
     return true;
 }
 
+// hide_from_game(): the buttons asked for during this every_frame(), and the
+// set the controller hooks are hiding. EndFrame swaps them over and hides them
+// for the next 2 controller reads, so they come back a moment after the code
+// stops asking (or the game pauses and every_frame() stops running).
+uint32_t g_HideNext;
+uint32_t volatile g_HideActive;
+uint32_t volatile g_HideReads;
+
 float g_WantedTimeSpeed = 1.0f;
 bool g_PushedThisFrame;
 uint32_t g_FramesSincePush = 1000;
@@ -146,6 +156,14 @@ uint32_t Link() {
 } // namespace
 
 namespace Engine {
+
+uint32_t HiddenButtons() {
+    return g_HideReads > 0 ? g_HideActive : 0;
+}
+
+void HiddenReadDone() {
+    if (g_HideReads > 0) g_HideReads = g_HideReads - 1;
+}
 
 bool InGame() {
     const uint32_t link = Link();
@@ -176,6 +194,10 @@ void BeginFrame() {
 }
 
 void EndFrame() {
+    g_HideActive = g_HideNext;
+    g_HideReads = 2;
+    g_HideNext = 0;
+
     // Hand the next queued spawn to the game. Spawn() refuses while the one
     // before is still being created; then it's simply tried again next frame.
     // (The player is only the "anchor": the game takes memory for the new actor
@@ -234,6 +256,17 @@ bool held(Button button) {
 
 bool pressed(Button button) {
     return (g_Held & ~g_HeldBefore & MaskFor(button)) != 0;
+}
+
+void hide_from_game(Button button) {
+    g_HideNext |= 1u << static_cast<uint32_t>(button);
+}
+
+void hide_dpad_from_game() {
+    hide_from_game(UP);
+    hide_from_game(DOWN);
+    hide_from_game(LEFT);
+    hide_from_game(RIGHT);
 }
 
 // --- Link --------------------------------------------------------------------
@@ -373,6 +406,17 @@ bool give_item(const char* name, int amount) {
 
 bool equip(const char* name) {
     return Pouch::EquipItem(name) != 0;
+}
+
+bool take_item(const char* name, int amount) {
+    return Pouch::RemoveItem(name, amount) > 0;
+}
+
+bool has_item(const char* name) {
+    // The game sorts items into kinds (sword, material, key item...) and keeps a
+    // list of each; look in the right list.
+    const int32_t kind = Pouch::GetTypeForName(name);
+    return kind >= 0 && Pouch::FindItemIndex(kind, name) >= 0;
 }
 
 int rupees() {

@@ -75,6 +75,8 @@ ends its header with **Ideas to try**.
 | `starter_kit.cpp` | Gives and equips a sword, bow, shield and arrows | ZL + R | item names, a function with parameters |
 | `spawn_enemies.cpp` | Spawns a random enemy in front of Link | ZL + Y | arrays of text, `random_number()` |
 | `spawn_rocks.cpp` | Drops a row of five boulders | ZL + A | `for` loops |
+| `spawn_menu.cpp` | A menu of enemies, animals, horses, weapons, food and objects to spawn | L3, then the D-pad | structs, a menu, hiding the D-pad from the game |
+| `ability_menu.cpp` | A menu that switches runes, upgrades, Champion abilities and the paraglider on and off | R3, then the D-pad | flags plus key items, an ON / off column |
 | `unbreakable_weapons.cpp` | Weapons never wear out | — | remembering values, arrays |
 | `exploration_rewards.cpp` | Rupees for Korok seeds, shrines and towers | — | reacting to events |
 | `longer_stasis.cpp` | Stasis freezes things three times as long (untested on the rune itself; see the file) | — | Link's settings |
@@ -83,7 +85,8 @@ ends its header with **Ideas to try**.
 | `double_rupees.cpp` | Every rupee you pick up counts twice | ZL + Minus tests it | hooks: the game calls your code |
 
 On the keyboard, **ZL is the Z key**. A is E, B is Left Shift, X is Space, Y is
-F, L is Q, R is R, ZR is V, Minus is M and the D-pad is the arrow keys. The top-level README has
+F, L is Q, R is R, ZR is V, Minus is M, L3 (pressing the left stick) is C and
+the D-pad is the arrow keys. The top-level README has
 the full layout.
 
 All examples were pasted into one `my_mod.cpp` together, following their own
@@ -203,24 +206,31 @@ Each of these really happened while making the examples. Most make a good
 
 These are now handled inside the engine, so the examples don't have to:
 
-10. **Only one spawn at a time.** The framework holds a single spawn request and
+10. **Hiding the D-pad from the game, but not from the mod.** The engine
+    clears the D-pad in the game's controller read while `spawn_menu.cpp` is
+    open. Its hooks have to be installed before botw.input's on the same
+    functions: WiiXLaunch calls hooks first-installed-first, so if botw.input
+    came first, it would record the controller after the D-pad was cleared and
+    `pressed(UP)` would never be true. See the controller hooks in
+    `engine/main.cpp`.
+11. **Only one spawn at a time.** The framework holds a single spawn request and
    refuses the next until the game has created the first. `spawn()` queues
    requests and hands over one per frame, so five boulders in one frame all
    arrive.
-11. **Items given on the title screen vanished.** A pouch exists there, so adding
+12. **Items given on the title screen vanished.** A pouch exists there, so adding
    items "works", and then loading the save replaces it. The title screen even
    has a Link, but his max life is 0. `Engine::InGame()` checks that before
    running `every_frame()`.
-12. **"New weapon!" printed every frame** (`unbreakable_weapons.cpp`). Each
+13. **"New weapon!" printed every frame** (`unbreakable_weapons.cpp`). Each
    lookup of the equipped sword hands out a new handle, so handles can't be
    compared; the actor's ID can. While an equip settles, the lookup also
    flickers empty every other frame. See `TrackWeapon` in `engine/game.cpp`.
-13. **Equips and forced weather silently never happened**, because something has
+14. **Equips and forced weather silently never happened**, because something has
    to call the game's "keep going" functions every frame (`EndFrame` in
    `engine/game.cpp`).
-14. **Every mod grabbed ~200 KB of memory** and the GUI's fonts no longer fit,
+15. **Every mod grabbed ~200 KB of memory** and the GUI's fonts no longer fit,
     until each mod stated `heapRequest` in `mod.json`.
-15. **ZL was on Tab**, which Cemu uses to show the GamePad screen, so it moved
+16. **ZL was on Tab**, which Cemu uses to show the GamePad screen, so it moved
     to Z.
 
 ## Behind the curtain

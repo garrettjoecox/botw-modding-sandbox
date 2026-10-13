@@ -39,6 +39,10 @@ uint32_t StyleFor(Color color, float scale) {
     if (g_StyleCount >= sizeof(g_Styles) / sizeof(g_Styles[0])) return g_Styles[0].id;
     const uint32_t id = Gui::StyleCreate();
     if (!id) return 0;
+    // A new style is a copy of the game's message style, which centres text
+    // vertically. Gui::Text gives it a zero-height box, so text came out
+    // centred on y - half a line higher than asked. Top-left, as botw.h says.
+    Gui::StyleAlign(id, 0, 0);   // Align::Left, VAlign::Top
     Gui::StyleScale(id, scale);
     Gui::StyleColor(id, color, color);
     Gui::StyleShadow(id, 1, 0x00000080, 2.0f, 2.0f);
@@ -57,7 +61,7 @@ struct Shape {
     char text[96];
 };
 
-constexpr uint32_t kMaxShapes = 48;
+constexpr uint32_t kMaxShapes = 96;
 
 // Two lists: every_frame() fills one while Draw() paints the other.
 Shape g_Shapes[2][kMaxShapes];
@@ -226,6 +230,69 @@ void Draw() {
 }
 
 } // namespace Engine
+
+// --- menus (botw.h) ----------------------------------------------------------
+
+namespace {
+
+int g_MenuHoldFrames;   // how long Up or Down has been held
+
+// True when a menu should move a step: once when the button goes down, then
+// over and over while it's held.
+bool MenuStep(Button button) {
+    if (pressed(button)) {
+        g_MenuHoldFrames = 0;
+        return true;
+    }
+    if (!held(button)) return false;
+    ++g_MenuHoldFrames;
+    return g_MenuHoldFrames > 12 && g_MenuHoldFrames % 3 == 0;
+}
+
+constexpr Color kChosenLine = 0xFFFFFF30;   // see-through white behind the chosen line
+
+} // namespace
+
+int menu_up_down(int chosen, int count) {
+    if (count <= 0) return 0;
+    if (MenuStep(UP)) {
+        chosen = (chosen + count - 1) % count;   // up from the top wraps to the bottom
+        play_sound("mc_Key_On");
+    }
+    if (MenuStep(DOWN)) {
+        chosen = (chosen + 1) % count;
+        play_sound("mc_Key_On");
+    }
+    return chosen;
+}
+
+void draw_menu(const char* title, const char* const* lines, int count, int chosen,
+               const char* const* values, const char* footer) {
+    const int visible = 10;                        // the most lines shown at once
+    const int rows = count < visible ? count : visible;
+
+    // Scroll so the chosen line stays in view.
+    int first = chosen - visible / 2;
+    if (first > count - visible) first = count - visible;
+    if (first < 0) first = 0;
+
+    const float x = 40;
+    const float y = 120;
+    draw_box(x, y, 420, 120 + rows * 32, SHADOW);
+    draw_colored_text(x + 20, y + 12, YELLOW, "%s", title);
+
+    for (int row = 0; row < rows; ++row) {
+        const int i = first + row;
+        const float line_y = y + 52 + row * 32;
+        const Color color = i == chosen ? YELLOW : CREAM;
+        if (i == chosen) draw_box(x + 10, line_y - 2, 400, 32, kChosenLine);
+        draw_colored_text(x + 24, line_y, color, "%s", lines[i]);
+        if (values && values[i]) draw_colored_text(x + 340, line_y, color, "%s", values[i]);
+    }
+    if (first > 0) draw_text(x + 380, y + 12, "...");
+    if (first + visible < count) draw_text(x + 380, y + 52 + rows * 32, "...");
+    if (footer) draw_text(x + 20, y + 84 + rows * 32, "%s", footer);
+}
 
 // --- botw.h ------------------------------------------------------------------
 

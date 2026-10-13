@@ -49,10 +49,17 @@ void print(const char* format, ...) BOTW_CHECK_FORMAT(1, 2);
 // On the keyboard: ZL = Z, X = Space, R = R, Minus = M, D-pad = arrow keys.
 // The full list is in the top-level README.
 
-enum Button { A, B, X, Y, L, R, ZL, ZR, PLUS, MINUS, UP, DOWN, LEFT, RIGHT };
+// L3 and R3 are pressing the sticks in (keyboard: C and B).
+enum Button { A, B, X, Y, L, R, ZL, ZR, PLUS, MINUS, UP, DOWN, LEFT, RIGHT, L3, R3 };
 
 bool held(Button button);     // true the whole time the button is down
 bool pressed(Button button);  // true only on the frame it goes down - once per press
+
+// Stops the game seeing a button, so it doesn't react to it - but held() and
+// pressed() still see it. Lasts a moment, so call it every frame you want it.
+// examples/spawn_menu.cpp hides the D-pad while its menu is open.
+void hide_from_game(Button button);
+void hide_dpad_from_game();   // all four D-pad directions
 
 // =============================================================================
 // Link
@@ -120,6 +127,8 @@ bool        weapon_changed(Weapon weapon);   // true on the frame Link equips a 
 // first hit.)
 bool give_item(const char* name, int amount);
 bool equip(const char* name);                  // equips an item Link already has
+bool take_item(const char* name, int amount);  // false if Link had none to take
+bool has_item(const char* name);               // does Link have at least one?
 
 int  rupees();
 void set_rupees(int amount);
@@ -218,10 +227,31 @@ void draw_box(float x, float y, float width, float height, Color color);
 bool play_sound(const char* name);   // false if the game has no sound by that name
 
 // =============================================================================
+// Menus
+// =============================================================================
+//
+// The pieces of a list menu like examples/spawn_menu.cpp's: a panel at the
+// top-left with a title, the lines to choose from, and the chosen one
+// highlighted. Lists longer than ten lines scroll.
+
+// Draws the menu for this frame. values, if given, is a second column (e.g.
+// "ON" / "off") with one entry per line.
+void draw_menu(const char* title, const char* const* lines, int count, int chosen,
+               const char* const* values = nullptr,
+               const char* footer = "Right: select   Left: back");
+
+// Up and Down move the chosen line, with a click; holding one repeats.
+// Gives back the new chosen line.
+int menu_up_down(int chosen, int count);
+
+// =============================================================================
 // Handy extras
 // =============================================================================
 
 bool same_text(const char* a, const char* b);  // are these two pieces of text the same?
+
+// How many things are in a list (an array): count_of(enemies).
+template <typename T, int N> constexpr int count_of(T (&)[N]) { return N; }
 int  random_number(int low, int high);         // a random whole number from low to high
 
 // Makes the game add to one of its counters itself, the same way it does when

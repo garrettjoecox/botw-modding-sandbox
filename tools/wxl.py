@@ -8,6 +8,7 @@
     wxl play             launch BotW in Cemu
     wxl log [TEXT]       show the mod's messages from the last run (optionally filtered)
     wxl actors [TEXT]    list actor names (for spawn) with their English names
+    wxl items            add the mod's new items (the Spawning Wand) to the game's data
     wxl host             rebuild the WiiXLaunch host and refresh pack/ (rarely needed)
     wxl doctor           check what is installed and what is missing
 
@@ -301,6 +302,8 @@ def cmd_setup(args):
         copy_title(args.update, UPDATE_DIR, "update")
     if args.dlc:
         copy_title(args.dlc, DLC_DIR, "DLC")
+    if (UPDATE_DIR / "content").is_dir():
+        cmd_items(args)
     cmd_doctor(args)
 
 
@@ -316,6 +319,8 @@ def cmd_doctor(args):
     ver = title_version(UPDATE_DIR)
     status(ver == "208", f"update v208 (found: {ver or 'none'})", "wxl setup --update <dump folder>")
     status((DLC_DIR / "content").exists(), "DLC (optional)", "wxl setup --dlc <dump folder>")
+    status((PACK_DST / "content" / "Actor" / "Pack" / "Weapon_Sword_900.sbactorpack").exists(),
+           "new items (the Spawning Wand)", "wxl items")
     native = native_devkitppc()
     status(bool(native) or docker_available(),
            f"toolchain ({'native ' + str(native) if native else 'Docker' if docker_available() else 'none'})",
@@ -456,6 +461,24 @@ def cmd_actors(args):
         print(f"[{len(names)} actors. Narrow it down: wxl actors bokoblin]")
 
 
+def cmd_items(args):
+    """New items, made from the user's own dump into the graphic pack's content/."""
+    import new_items   # tools/new_items.py, next to this script
+    content = [d / "content" for d in (UPDATE_DIR, GAME) if (d / "content").is_dir()]
+    if not (UPDATE_DIR / "content").is_dir():
+        die("needs the v208 update's files - run: wxl setup --update <dump>")
+    say("building new items from the game files (takes a few seconds)")
+    files, done = new_items.build(content)
+    out = PACK_DST / "content"
+    for path, data in files.items():
+        dst = out / path
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        dst.write_bytes(data)
+    for line in done:
+        say(f"added {line}")
+    say(f"wrote {len(files)} files to {out.relative_to(ROOT)} - restart the game to load them")
+
+
 def cmd_host(args):
     ensure_wiixlaunch()
     toolchain = pick_toolchain(args)
@@ -504,6 +527,8 @@ def main():
     p = sub.add_parser("actors", help="list actor names for spawn(), with English names")
     p.add_argument("text", nargs="?", help="only names containing this (either name)")
     p.set_defaults(func=cmd_actors)
+
+    sub.add_parser("items", help="add the new items to the game's data").set_defaults(func=cmd_items)
 
     p = sub.add_parser("host", help="rebuild the WiiXLaunch host")
     toolchain_flags(p)

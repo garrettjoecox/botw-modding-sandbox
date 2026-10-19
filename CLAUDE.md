@@ -43,7 +43,8 @@ list of ideas.
 | `mod/examples/*.cpp` | Copy-paste examples. **Not built** (`wxl build` skips them) |
 | `mod/mod.json` | id `my_mod`, `heapRequest` 8192, the required surfaces. `wxl build` rewrites `sources` |
 | `tools/wxl.py` | The workspace script (`./wxl` on macOS, `wxl.cmd` on Windows) |
-| `tools/botw_files.py` | Readers for the dump: Yaz0, SARC, MSBT, actor names, English names |
+| `tools/botw_files.py` | Readers and writers for the game's formats: Yaz0, SARC, MSBT, AAMP, BYML, RSTB |
+| `tools/new_items.py` | `wxl items`: builds new items (the Spawning Wand, `Weapon_Sword_900`) from the dump into the graphic pack's `content/` |
 | `tools/test/` | In-game test helpers (macOS only, see below) |
 | `tools/profiles/` | Default keyboard profiles (the old GamePad scheme) |
 | `tools/wiixlaunch-local.patch` | Local changes to WiiXLaunch, applied by `wxl setup` |
@@ -61,6 +62,7 @@ open -a Docker                 # first, if `docker info` fails: builds run in th
 ./wxl play                     # launch the game (mods load at boot, so restart after every build)
 ./wxl log [TEXT]               # "my_mod: " lines + loader problems from the last run; --all for everything
 ./wxl actors [TEXT]            # ~6,300 actor names with English names, from the dump
+./wxl items                    # rebuild the new items into the graphic pack (setup runs it too)
 ./wxl doctor                   # what's installed or missing
 ```
 
@@ -279,6 +281,10 @@ Slate's scope. Use `hide_from_game()` when a mod takes over a button.
     equipped copy starts at full life, which hid this bug.
   - A new weapon handle comes back on every lookup, so compare actor IDs
     (`TrackWeapon`).
+  - `has_room_for` compares `botw.pouch` `SlotCount` (0 sword, 1 bow, 3 shield)
+    with the s32 flags `WeaponPorchStockNum` / `BowPorchStockNum` /
+    `ShieldPorchStockNum` (start 8 / 5 / 4). `SlotCount` updates in the same
+    frame as `AddItem`.
   - Items given on the title screen are lost when the save loads.
 - **Flags:**
   - `set_flag` takes effect on the next frame.
@@ -301,6 +307,34 @@ Slate's scope. Use `hide_from_game()` when a mod takes over a button.
   log.
 - **Memory:** without `heapRequest` in `mod.json`, each mod took about 200 KB
   and the GUI's fonts no longer fitted.
+
+## New items (measured)
+
+- `wxl items` writes `Actor/Pack/<name>.sbactorpack`, `Actor/ActorInfo.product.sbyml`,
+  every `Pack/Bootup_<lang>.pack`, `UI/StockItem/<name>.sbitemico` and the RSTB
+  into `cemu/portable/graphicPacks/WiiXLaunch_BotW/content/`. Cemu reads them in
+  place of the game's. They also apply to the user's own play.
+- The Spawning Wand is the Ice Rod's pack with `AIProgramUser EquipItemBase` and
+  `ASUser EquipItemCommon` (from `Weapon_Sword_001`), `WeaponSubType ""`, and the
+  rod, cold and compendium tags dropped. It doesn't shoot. Files that change get
+  the new name, because the game caches files by path.
+- Name and description go in `ActorType/WeaponSmallSword.msbt` (`<name>_Name`,
+  `<name>_Desc`). The icon is the Ice Rod's.
+- RSTB: ActorInfo has no entry. A new file gets the entry of the file it was
+  copied from, plus its growth and 0x400. The message archive's entry is its
+  decompressed size + 408.
+- The model list's `MulColor` / `AddColor` made no visible difference to the Ice
+  Rod. `BaseScale` is set to 1.1.
+- The writers round-trip the game's files: SARC, BYML and RSTB exactly, AAMP by
+  value (the layout differs from Nintendo's).
+- `sword_drawn()` has no import behind it: it goes by where the sword is in
+  Link's frame. On his back (put away, or bow out) it's 1.3–1.5 m up, within
+  0.3 m sideways and not forward. In hand it's 0.4–1.0 m up, or off to the
+  side or in front mid-swing. It takes 6 frames to count as put away and 2 to
+  count as drawn. Climbing, swimming and gliding weren't measured. The test
+  save's start is near cliffs: sprinting or walking there killed Link twice.
+- `swung()` is the framework's attack counter. Taking a weapon out with the
+  first press of Y doesn't count as a swing.
 
 ## Known issues and open threads
 

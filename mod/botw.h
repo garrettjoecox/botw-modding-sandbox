@@ -113,6 +113,9 @@ const char* weapon_name(Weapon weapon);      // its item name, like "Weapon_Swor
 int         durability(Weapon weapon);       // how worn it is; a new Traveler's Bow has 2200
 void        set_durability(Weapon weapon, int durability);
 bool        weapon_changed(Weapon weapon);   // true on the frame Link equips a different one
+bool        swung();                         // true on the frame Link swings his weapon
+bool        sword_drawn();                   // is he holding his sword out? (false when it's on his back,
+                                             // or he has his bow out)
 
 // =============================================================================
 // Inventory and rupees
@@ -129,6 +132,7 @@ bool give_item(const char* name, int amount);
 bool equip(const char* name);                  // equips an item Link already has
 bool take_item(const char* name, int amount);  // false if Link had none to take
 bool has_item(const char* name);               // does Link have at least one?
+bool has_room_for(const char* name);           // is there a free slot for it? (swords, bows and shields fill up)
 
 int  rupees();
 void set_rupees(int amount);

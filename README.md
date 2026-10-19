@@ -21,6 +21,7 @@ wxl build                                            compile the mod in mod/ and
 wxl play                                             launch the game
 wxl log [TEXT]                                       what the mod print()ed in the last run
 wxl actors [TEXT]                                    the game's names for things, for spawn()
+wxl items                                            add the new items (the Spawning Wand) to the game
 wxl doctor                                           what's installed / missing
 wxl host                                             rebuild the framework core (rarely)
 ```
@@ -70,11 +71,17 @@ any folder that contains the `code/content/meta` folders somewhere inside it.
 | `mod/` | The mod: `my_mod.cpp`, examples to copy from, and the engine underneath | yes |
 | `pack/WiiXLaunch_BotW/` | Prebuilt host graphic pack (same file on every OS) | yes |
 | `tools/wxl.py` | The workspace script | yes |
+| `tools/botw_files.py`, `tools/new_items.py` | Read and write the game's file formats; build new items from your own dump | yes |
 | `tools/profiles/` | Keyboard profiles; Cemu stores OS-specific key codes | yes |
 | `tools/wiixlaunch-local.patch` | Local changes to WiiXLaunch (see below) | yes |
 | `tools/docker/` | devkitPPC + Pillow image, used when there's no native devkitPro | yes |
 | `cemu/` | Cemu, its config, your game files and saves | **no** |
 | `WiiXLaunch/` | Framework checkout, fetched by `setup` | no |
+
+`wxl items` (also run by `setup`) builds new items, like the Spawning Wand, from
+your own game files into Cemu's graphic pack; nothing from the game is in git.
+If an item ever breaks the game, delete `content/Actor`, `content/Pack`,
+`content/System` and `content/UI` inside `cemu/portable/graphicPacks/WiiXLaunch_BotW/`.
 
 `.gitignore` keeps game files, saves, Cemu and build output out of git. Never
 commit or send a copy of the game; each person needs their own dump.

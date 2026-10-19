@@ -44,6 +44,7 @@ uint32_t MaskFor(Button button) {
 bool g_KorokFound;
 bool g_ShrineFinished;
 bool g_TowerActivated;
+bool g_Swung;
 
 // --- the equipped weapons ----------------------------------------------------
 
@@ -165,6 +166,47 @@ void HiddenReadDone() {
     if (g_HideReads > 0) g_HideReads = g_HideReads - 1;
 }
 
+// Nothing in the framework says whether the sword is drawn, so this looks at
+// where it is. Measured in Link's own frame (metres): on his back - put away,
+// or with the bow out - it sits 1.3-1.5 up, within 0.3 of his centre line and
+// not in front of him. In his hand it's lower, off to one side or in front,
+// even mid-swing. A few frames in a row decide, so one odd frame of a swing
+// doesn't count.
+constexpr float kBackMinUp = 1.1f;
+constexpr float kBackMaxSide = 0.3f;
+constexpr float kBackMaxForward = 0.15f;
+constexpr int kFramesToPutAway = 6;
+constexpr int kFramesToDraw = 2;
+
+bool g_SwordDrawn;
+int g_SwordStreak;   // frames in a row the sword has looked the other way
+
+void TrackSwordDrawn() {
+    const WeaponSlot* slot = Slot(SWORD);
+    float l[12], s[12];
+    if (!slot || !slot->handle || !Actor::GetMatrix(Link(), l) || !Actor::GetMatrix(slot->handle, s)) {
+        g_SwordDrawn = false;
+        g_SwordStreak = 0;
+        return;
+    }
+    // Link's matrix: columns 0, 1, 2 are his right, up and forward; 3 is his position.
+    const float d[3] = {s[3] - l[3], s[7] - l[7], s[11] - l[11]};
+    const float side = d[0] * l[0] + d[1] * l[4] + d[2] * l[8];
+    const float up = d[0] * l[1] + d[1] * l[5] + d[2] * l[9];
+    const float forward = d[0] * l[2] + d[1] * l[6] + d[2] * l[10];
+    const bool on_back = up > kBackMinUp && side > -kBackMaxSide && side < kBackMaxSide &&
+                         forward < kBackMaxForward;
+    if (on_back != g_SwordDrawn) {   // looks the same as what we already think
+        g_SwordStreak = 0;
+        return;
+    }
+    g_SwordStreak = g_SwordStreak + 1;
+    if (g_SwordStreak >= (g_SwordDrawn ? kFramesToPutAway : kFramesToDraw)) {
+        g_SwordDrawn = !g_SwordDrawn;
+        g_SwordStreak = 0;
+    }
+}
+
 bool InGame() {
     const uint32_t link = Link();
     // The title screen has a Link too, but his max life is 0.
@@ -187,10 +229,13 @@ void BeginFrame() {
     while (Events::ConsumeShrineComplete()) g_ShrineFinished = true;
     g_TowerActivated = false;
     while (Events::ConsumeTowerOpen()) g_TowerActivated = true;
+    // The framework counts swings (Link's attack counter, Wii U only).
+    g_Swung = Player::ConsumeAttackEvent() != 0;
 
     TrackWeapon(SWORD);
     TrackWeapon(SHIELD);
     TrackWeapon(BOW);
+    TrackSwordDrawn();
 }
 
 void EndFrame() {
@@ -393,6 +438,10 @@ void set_durability(Weapon weapon, int value) {
     if (slot && slot->handle) Actor::SetLife(slot->handle, value);
 }
 
+bool swung() { return g_Swung; }
+
+bool sword_drawn() { return Engine::g_SwordDrawn; }
+
 bool weapon_changed(Weapon weapon) {
     const WeaponSlot* slot = Slot(weapon);
     return slot && slot->changed;
@@ -417,6 +466,20 @@ bool has_item(const char* name) {
     // list of each; look in the right list.
     const int32_t kind = Pouch::GetTypeForName(name);
     return kind >= 0 && Pouch::FindItemIndex(kind, name) >= 0;
+}
+
+bool has_room_for(const char* name) {
+    // Swords, bows and shields each have a limited number of slots, which
+    // Hestu adds to. The limits are game flags (from GameData's s32_data).
+    const char* limit_flag = nullptr;
+    const int32_t kind = Pouch::GetTypeForName(name);
+    if (kind == 0) limit_flag = "WeaponPorchStockNum";       // starts at 8
+    else if (kind == 1) limit_flag = "BowPorchStockNum";     // starts at 5
+    else if (kind == 3) limit_flag = "ShieldPorchStockNum";  // starts at 4
+    else return kind >= 0;                                   // anything else always fits
+    int32_t limit = 0;
+    if (!GameData::GetFlagS32(limit_flag, &limit)) return false;
+    return Pouch::SlotCount(kind) < limit;
 }
 
 int rupees() {
@@ -623,3 +686,4 @@ int random_number(int low, int high) {
     const uint32_t range = static_cast<uint32_t>(high - low) + 1;
     return low + static_cast<int>(range ? state % range : state);
 }
+

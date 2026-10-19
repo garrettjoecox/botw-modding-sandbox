@@ -76,6 +76,7 @@ ends its header with **Ideas to try**.
 | `spawn_enemies.cpp` | Spawns a random enemy in front of Link | ZL + Y | arrays of text, `random_number()` |
 | `spawn_rocks.cpp` | Drops a row of five boulders | ZL + A | `for` loops |
 | `spawn_menu.cpp` | A menu of enemies, animals, horses, weapons, food and objects to spawn | R3, then the D-pad | structs, a menu, hiding buttons from the game |
+| `spawning_wand.cpp` | A new weapon, the Spawning Wand: pick from a menu, swing it to spawn things (run `wxl items` first) | the D-pad, then swing | `swung()`, `has_room_for()`, structs, keeping a weapon from breaking |
 | `ability_menu.cpp` | A menu that switches runes, upgrades, Champion abilities and the paraglider on and off | R3, then the D-pad | flags plus key items, an ON / off column |
 | `unbreakable_weapons.cpp` | Weapons never wear out | — | remembering values, arrays |
 | `exploration_rewards.cpp` | Rupees for Korok seeds, shrines and towers | — | reacting to events |

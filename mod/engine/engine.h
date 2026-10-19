@@ -39,6 +39,7 @@ WXL_USE_botw_player(GetEquippedSword);
 WXL_USE_botw_player(GetEquippedShield);
 WXL_USE_botw_player(GetEquippedBow);
 WXL_USE_botw_player(ActorUnsafeRawPointer);
+WXL_USE_botw_player(ConsumeAttackEvent);
 }
 
 namespace Actor {
@@ -75,6 +76,7 @@ WXL_USE_botw_gamedata(AddRupees);
 WXL_USE_botw_gamedata(GetKorokCount);
 WXL_USE_botw_gamedata(GetFlagBool);
 WXL_USE_botw_gamedata(SetFlagBool);
+WXL_USE_botw_gamedata(GetFlagS32);
 }
 
 namespace Pouch {
@@ -84,6 +86,7 @@ WXL_USE_botw_pouch(TickEquipRefresh);
 WXL_USE_botw_pouch(RemoveItem);
 WXL_USE_botw_pouch(GetTypeForName);
 WXL_USE_botw_pouch(FindItemIndex);
+WXL_USE_botw_pouch(SlotCount);
 }
 
 namespace Sound {

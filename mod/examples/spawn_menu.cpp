@@ -1,15 +1,15 @@
 // Example: Spawn menu
 //
-// Press L3 (click the left stick; the C key on the keyboard) to open a menu of
-// things to spawn:
+// Press R3 (click the right stick) to open a menu of things to spawn:
 //   Up / Down   choose
 //   Right       open a category, or spawn the thing that's chosen
 //   Left        go back to the categories (from there, close the menu)
-//   L3          close the menu
+//   R3          close the menu
 // Spawns land 5 metres in front of Link, and the menu stays open on the same
 // line, so you can spawn as many as you like. While the menu is open the game
-// doesn't see the D-pad, so it won't whistle or open its own quick menus.
-// (It does still see L3, so Link crouches when you open and close the menu.)
+// doesn't see the D-pad, so it won't whistle or open its own quick menus. It
+// never sees R3 at all while this is in use: R3 is normally the Sheikah
+// Slate's scope, which would otherwise open with the menu.
 //
 // To use it: copy everything below the "copy from here" line into my_mod.cpp,
 // above every_frame(). Then add this line inside every_frame():
@@ -26,7 +26,9 @@
 //     drawing: holding Up or Down repeats, and long lists scroll.
 //   * -> reads a field through a pointer: thing->actor is the actor of the
 //     thing that thing points at.
-//   * hide_dpad_from_game() is called every frame the menu is open.
+//   * hide_from_game(R3) is called every frame, and hide_dpad_from_game()
+//     every frame the menu is open. Hiding only lasts a moment, so it has to
+//     be asked for again each frame.
 //
 // Ideas to try:
 //   * Add your own category, or more things to a list (wxl actors finds names).
@@ -148,7 +150,8 @@ int spawn_menu_lines(const char** lines) {
 }
 
 void spawn_menu() {
-    if (pressed(L3)) {
+    hide_from_game(R3);   // every frame: R3 belongs to this menu now
+    if (pressed(R3)) {
         menu_open = !menu_open;
     }
     if (!menu_open) {

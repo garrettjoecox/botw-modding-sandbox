@@ -75,7 +75,7 @@ ends its header with **Ideas to try**.
 | `starter_kit.cpp` | Gives and equips a sword, bow, shield and arrows | ZL + R | item names, a function with parameters |
 | `spawn_enemies.cpp` | Spawns a random enemy in front of Link | ZL + Y | arrays of text, `random_number()` |
 | `spawn_rocks.cpp` | Drops a row of five boulders | ZL + A | `for` loops |
-| `spawn_menu.cpp` | A menu of enemies, animals, horses, weapons, food and objects to spawn | L3, then the D-pad | structs, a menu, hiding the D-pad from the game |
+| `spawn_menu.cpp` | A menu of enemies, animals, horses, weapons, food and objects to spawn | R3, then the D-pad | structs, a menu, hiding buttons from the game |
 | `ability_menu.cpp` | A menu that switches runes, upgrades, Champion abilities and the paraglider on and off | R3, then the D-pad | flags plus key items, an ON / off column |
 | `unbreakable_weapons.cpp` | Weapons never wear out | — | remembering values, arrays |
 | `exploration_rewards.cpp` | Rupees for Korok seeds, shrines and towers | — | reacting to events |
@@ -85,7 +85,7 @@ ends its header with **Ideas to try**.
 | `double_rupees.cpp` | Every rupee you pick up counts twice | ZL + Minus tests it | hooks: the game calls your code |
 
 On the keyboard, **ZL is the Z key**. A is E, B is Left Shift, X is Space, Y is
-F, L is Q, R is R, ZR is V, Minus is M, L3 (pressing the left stick) is C and
+F, L is Q, R is R, ZR is V, Minus is M, R3 (pressing the right stick) is B and
 the D-pad is the arrow keys. The top-level README has
 the full layout.
 
